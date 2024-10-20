@@ -1,4 +1,4 @@
-# llm-bart
+# BC-LLM
 
 All experiments are managed using `scons` and `nestly`.
 If you want to run a single experiment, specify the experiment's folder name, e.g. `scons exp_mimic`.
