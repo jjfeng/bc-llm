@@ -3,7 +3,7 @@
 All experiments are managed using `scons` and `nestly`.
 If you want to run a single experiment, specify the experiment's folder name, e.g. `scons exp_mimic`.
 
-# LLM Api
+## LLM Api
 To use the either the OpenAI models or Hugging Face models through the API add a .env file in the root folder of this directory
 
 ```
