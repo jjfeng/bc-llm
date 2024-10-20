@@ -1,0 +1,35 @@
+The goal is to come up with a concept bottleneck model that only extracts {num_concepts} meta-concepts from patient notes from the electronic health record to predict some outcome Y with maximum accuracy. A meta-concept is a binary feature extractor defined by a yes/no question. We have {num_concepts_fixed} meta-concepts so far:
+{meta_concepts}
+So far, we've fit a concept bottleneck model to predict Y using only the {num_concepts_fixed} existing meta-concepts.
+To brainstorm a {num_concepts}th meta-concept that will most improve the performance of the concept bottleneck model, here are some notes that have predicted probabilities from the existing {num_concepts_fixed}-concept bottleneck model that disagree the most with their true labels. Maybe you can help find a consistent pattern for refining the predicted probabilities, such that the existence of a meta-concept should increase the predicted probability and its absence should decrease the predicted probability?
+
+{pairs}
+
+Given this information, brainstorm three or more new candidate meta-concepts, clearly stated as a yes/no question. Do not suggest meta-concepts that already exist.
+
+Meta-concepts are yes/no questions. Meta-concepts should be cohesive, not the conjunction of two separate concepts.
+
+Summarize at the end with a JSON output with the following format:
+{"concepts":
+  [
+      {
+          "concept": "<CANDIDATE META CONCEPT>",
+          "words": <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF THIS CONCEPT>
+      },
+      ...
+  ]
+}
+
+Example:
+{"concepts":
+  [
+      {
+          "concept": "Is this patient experiencing stomach pain?",
+          "words": "stomachache, stomach, pain"
+      },
+      {
+          "concept": "Is this patient uninsured?",
+          "words": "uninsured, insurance"
+      }
+  ]
+}

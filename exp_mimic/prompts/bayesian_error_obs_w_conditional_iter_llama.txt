@@ -1,0 +1,29 @@
+The goal is to come up with a concept bottleneck model that only extracts {num_concepts} meta-concepts from patient notes from the electronic health record to predict some outcome Y with maximum accuracy. A meta-concept is a binary feature extractor defined by a yes/no question. We have {num_concepts_fixed} meta-concepts so far:
+{meta_concepts}
+So far, we've fit a concept bottleneck model to predict Y using only the {num_concepts_fixed} existing meta-concepts.
+
+To brainstorm a {num_concepts}th meta-concept that will most improve the performance of the concept bottleneck model, here are two pieces of information:
+
+1. We have used an LLM to summarize each note and fit a bag-of-words model on the summaries to predict the residuals. These are the top features in the residual model, in descending order of importance:
+
+{top_features_df}
+
+2. Here are some misclassified notes that have predicted probabilities from the existing {num_concepts_fixed}-concept bottleneck model that disagree the most with their true labels:
+
+{pairs}
+
+Given this information, brainstorm three or more new candidate meta-concepts, clearly stated as a yes/no question. Do not suggest meta-concepts that already exist.
+
+Instructions: Form groups of words to create cohesive candidates for the {num_concepts}th meta-concept. Be systematic, starting from the most predictive word in the residual model: check if it matches an existing meta-concept OR group it with other top features to form a candidate meta-concept. When constructing a candidate meta-concept, look in the misclassified notes to see if similar/related words show up. These notes can help one construct a more suitable meta-concept for the dataset. Work down the list, iterating through words that have yet to be grouped. Continue until every word is either grouped into a candidate meta-concept or matches an existing meta-concept. 
+
+Answer with a list of {num_meta_concepts} JSONs, one per line:
+{<QUESTION 1>: <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF QUESTION 1>}
+{<QUESTION 2>: <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF QUESTION 2>}
+...
+{<QUESTION {num_meta_concepts}>: <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF QUESTION {num_meta_concepts}>}
+
+Example answer:
+{"Does the note mention the patient having a history of pneumonia?": "pneumonia"}
+{"Does the note mention the patient being uninsured?": "uninsured, insurance"}
+
+Final answer:

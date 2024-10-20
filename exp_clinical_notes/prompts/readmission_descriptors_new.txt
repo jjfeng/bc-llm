@@ -1,0 +1,11 @@
+Here is part of a discharge summary for a congestive heart failure patient:
+"{note}"
+Estimate their readmission risk (provide a probability from 0-100%). Describe your reasoning, backing up with evidence from the note. Weigh factors that increase readmission risk against factors that decrease risk. Afterwards, convert this to a list in the following format. For each descriptor, also list multiple descriptors that mean the same thing or are generalizations of the descriptor (i.e. likely to be seen in other patients as well). Descriptors, synonyms, and generalizations should be succinct and no more than three words.
+Format:
+{"1": "<STRING_OF_DESCRIPTOR1_AND_SYNONYMS_AND_GENERALIZATIONS>"}
+{"2": "<STRING_OF_DESCRIPTOR2_AND_SYNONYMS_AND_GENERALIZATIONS>"}
+...
+Example:
+{"1": "Nicotine dependence, Substance dependence, Substance use disorder"}
+{"2": "Variable EF, CHF Exacerbation"}
+{"3": "Lexapro initiation, Mental Health Plan, Discharge instructions"}

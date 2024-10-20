@@ -1,0 +1,15 @@
+Here is a clinical note:
+"{note}"
+Output a list of descriptors that summarizes the patient case (such as aspects on demographics, diagnoses, SDOH, etc). For each descriptor, also list as many descriptors that mean the same thing or generalizations of the descriptor. All descriptors, synonyms, and generalizations cannot be more than two words. Output as a JSON in the following format. Do not output more than 30 entries in the JSON:
+{
+"1": "<STRING_OF_DESCRIPTOR1_AND_SYNONYMS_AND_GENERALIZATIONS>",
+"2": "<STRING_OF_DESCRIPTOR2_AND_SYNONYMS_AND_GENERALIZATIONS>",
+...
+}
+
+Example:
+{
+    "1": "elderly, senior",
+    "2": "stress fracture, fracture, frail",
+    ...
+}

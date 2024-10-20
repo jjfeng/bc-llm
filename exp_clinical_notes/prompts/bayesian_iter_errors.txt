@@ -1,0 +1,41 @@
+Our team previously fit a tabular model to predict 30-day unplanned readmission risk for congestive heart failure patients. The tabular model often misclassifies patients.  We are now fitting a concept bottleneck model (CBM) to understand when the readmission model will misclassify patients. For the CBM, Y=1 means the patient was correctly classified and Y=0 means the patient was misclassified by the existing tabular model. 
+
+Your goal is to help construct a concept bottleneck model (CBM) that extracts {num_concepts} meta-concepts to predict when the risk prediction model will misclassify a patient. A meta-concept is a binary feature extractor defined by a yes/no question. We have {num_concepts_fixed} meta-concepts so far:
+
+{meta_concepts}
+
+To come up with the {num_concepts}th meta-concept, I have done the following: I first fit a CBM on the {num_concepts_fixed} existing meta-concepts. Then to figure out how to improve this {num_concepts_fixed}-concept CBM, I first asked an LLM to extract a list of concepts that are present in each discharge summary, and then fit a linear regression model on the extracted concepts to predict the residuals of the {num_concepts_fixed}-concept CBM. These are the top extracted concepts in the resulting residual model, in descending order of importance:
+
+{top_features_df}
+
+To interpret this residual model, a general rule of thumb is that an extracted concept with a large positive coefficient means that the outcome is positively associated with the concept being mentioned in the note, and an extracted concept with a negative coefficient means that the outcome is negatively associated with the concept being mentioned in the note. Remember that notes typically discuss the current state as well as the past medical history of a patient, so a concept being mentioned is in reference to the present OR past state of the patient.
+
+Given the residual model, create cohesive candidates for the {num_concepts}th meta-concept. Be systematic and consider all the listed concepts in the residual model. Start from the most to the least predictive concept. For each concept, check if it matches an existing meta-concept or create a new candidate meta-concept. Work down the list, iterating through each concept. Clearly state each candidate meta-concept as a yes/no question.
+
+Suggestions for generating candidate meta-concepts: Do not propose meta-concepts that are simply a union of two different concepts (e.g. "Does the note mention this patient experiencing stomach pain or being female?" is not allowed), questions with answers that are almost always a yes (e.g. the answer to "Does the note mention this patient being sick?" is almost always yes), or questions where the yes/no options are not clearly defined (e.g. "Does the note mention this patient experiencing difficulty?" is not clearly defined because difficulty may mean financial difficulty, physical difficulties, etc). Do not propose meta-concepts where you would expect over 95% agreement or disagreement with the {num_concepts_fixed} existing meta-concepts (e.g. "Does the note mention the patient having high blood pressure?" overlaps too much with "Does the note mention the patient having hypertension?").
+
+Finally, summarize all the generated candidates for the {num_concepts}-th meta-concept in a JSON. Merge any candidate meta-concepts that are essentially the same (where you would expect over 95% agreement) or essentially opposites (you would expect over 95% disagreement). In the JSON, include a list of comma-separated list of phrases that mean the same or opposite of each candidate meta-concept. The final JSON should have the following format:
+{"concepts":
+  [
+      {
+          "concept": "<CANDIDATE META CONCEPT>",
+          "words": <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF THIS CONCEPT>
+      },
+      ...
+  ]
+}
+
+Example:
+{"concepts":
+  [
+      {
+          "concept": "Does the note mention the patient having a history of pneumonia?",
+          "words": "pneumonia"
+      },
+      {
+          "concept": "Does the note mention the patient being uninsured?",
+          "words": "uninsured, insurance"
+      },
+      ...
+  ]
+}

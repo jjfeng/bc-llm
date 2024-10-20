@@ -1,0 +1,10 @@
+Here is part of a discharge summary for a congestive heart failure patient:
+"{note}"
+Your goal is to extract a list of descriptors from the note that are relevant to assessing the patient's 30-day unplanned readmission risk. Descriptors can include aspects such as demographics, medical history, SDOH, follow-up plans, medications, etc. For each descriptor, also list as many descriptors that mean the same thing or are generalizations of the descriptor. All descriptors, synonyms, and generalizations cannot be more than two words. Output in the following format:
+{"1": "<STRING_OF_DESCRIPTOR1_AND_SYNONYMS_AND_GENERALIZATIONS>"}
+{"2": "<STRING_OF_DESCRIPTOR2_AND_SYNONYMS_AND_GENERALIZATIONS>"}
+...
+
+Example:
+{"1": "elderly, senior"}
+{"2": "stress fracture, fracture, frail"}

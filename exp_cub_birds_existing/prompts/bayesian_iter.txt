@@ -1,0 +1,38 @@
+The goal is to come up with a concept bottleneck model that only extracts {num_concepts} meta-concepts to describe attributes in an image to predict some outcome Y with maximum accuracy. A meta-concept is a binary feature extractor defined by a yes/no question. We have {num_concepts_fixed} meta-concepts so far:
+{meta_concepts}
+
+To come up with candidates for the {num_concepts}th meta-concept, I have done the following: I first fit a CBM on the {num_concepts_fixed} existing meta-concepts. Then to figure out how to improve this {num_concepts_fixed}-concept CBM, I first asked an LLM to extract a list of attributes that are present in each image, and then fit a linear regression model on the extracted attributes to predict the residuals of the {num_concepts_fixed}-concept CBM. These are the top extracted attributes in the resulting residual model, in descending order of importance:
+
+{top_features_df}
+
+To interpret this residual model, a general rule of thumb is that an extracted attribute with a large positive coefficient means that the outcome is positively associated with the attribute being in the image, and an extracted attribute with a negative coefficient means that the outcome is negatively associated with the attribute being in the image.
+
+Given the residual model, create cohesive candidates for the {num_concepts}th meta-concept. Be systematic by working through every attribute in the residual model, starting from the most to the least predictive. For each attribute, check if it matches an existing meta-concept or create a new candidate meta-concept. Work down the list, iterating through each attribute. Clearly state each candidate meta-concept as a yes/no question.
+
+Suggestions for generating candidate meta-concepts: Do not propose meta-concepts that are simply a union of two different concepts (e.g. "Does this image contain hands or fur?" is not allowed) or questions with answers that are almost always a yes or almost always a no (e.g. the answer to "Does this image contain a background?" is almost always yes, and so should be excluded). Do not propose meta-concepts where you would expect over 95% agreement or disagreement with the {num_concepts_fixed} existing meta-concepts (e.g. "Does the image show a fluffy dog?" overlaps too much with "Does the image show a furry dog?").
+
+Summarize at the end with a JSON output with the following format:
+{"concepts":
+  [
+      {
+          "concept": "<CANDIDATE META CONCEPT>",
+          "words": <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF THIS CONCEPT>
+      },
+      ...
+  ]
+}
+
+Example:
+{"concepts":
+  [
+      {
+          "concept": "Does this image contain hands?",
+          "words": "hands, palms"
+      },
+      {
+          "concept": "Does this image contain fur?",
+          "words": "fur, hair"
+      },
+      ...
+  ]
+}

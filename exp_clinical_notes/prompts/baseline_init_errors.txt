@@ -1,0 +1,35 @@
+Our team previously fit a tabular model to predict 30-day unplanned readmission risk for congestive heart failure patients. The tabular model often misclassifies patients. We are now fitting a concept bottleneck model (CBM) to understand when the readmission model will misclassify patients. For the CBM, Y=1 means the patient was correctly classified and Y=0 means the patient was misclassified by the existing tabular model. Specifically, the goal is to construct a CBM that extract {num_meta_concepts} meta-concepts from the discharge summary to predict misclassifications.
+
+The top words most associated with model misclassifications have been estimated using a simple logistic regression model with tf-idf features. Based on the top words, come up with {num_meta_concepts} meta-concepts. A meta-concept has to be defined in terms of a yes/no question, e.g. "Does the note mention this patient experiencing stomach pain?". Pick meta-concepts that are as specific as possible, without being too broad.
+
+Words with top coefficients:
+
+{top_features_df}
+
+Summarize at the end with a JSON output with the following format:
+{"concepts":
+  [
+      {
+          "concept": "<CANDIDATE META CONCEPT>",
+          "words": <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF THIS CONCEPT>
+      },
+      ...
+  ],
+}
+
+Example:
+{"concepts":
+  [
+      {
+          "concept": "Does the note mention the patient having a history of pneumonia?",
+          "words": "pneumonia"
+      },
+      {
+          "concept": "Does the note mention the patient being uninsured?",
+          "words": "uninsured, insurance"
+      },
+      ...
+  ]
+}
+
+Ensure your answer contains {num_meta_concepts} concepts. Your answer:

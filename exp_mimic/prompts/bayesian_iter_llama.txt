@@ -1,0 +1,18 @@
+We are brainstorming questions that are important in clinical text.
+
+These are the questions so far:
+{meta_concepts}
+
+Come up with a few new candidate questions based on these words:
+
+{top_features_df}
+
+Answer with a list of JSONs with a key and value that are both strings. Return one JSON per line:
+{<CANDIDATE QUESTION 1>: <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF CANDIDATE QUESTION 1>}
+{<CANDIDATE QUESTION 2>: <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF CANDIDATE QUESTION 2>}
+
+Example answer:
+{"Does the note mention the patient having a history of pneumonia?": "pneumonia"}
+{"Does the note mention the patient being uninsured?": "uninsured, insurance"}
+
+Final answer:

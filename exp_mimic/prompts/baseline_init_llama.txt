@@ -1,0 +1,19 @@
+We are fitting a concept bottleneck model for predicting some outcome Y based on clinical text. The goal is to come up with {num_meta_concepts} meta-concepts to extract from the text to maximize the accuracy of the concept bottleneck model.
+
+Based on the top words most associated with the outcome Y estimated using a simple logistic regression model with tf-idf features, come up with {num_meta_concepts} meta-concepts. A meta-concept has to be defined in terms of a yes/no question, e.g. "Does the note mention this patient experiencing stomach pain?". The concept should be defined in a way that is associated with the outcome Y, so for words that typically correspond to a "yes" answer for the question should have large positive coefficients, whereas words that typically correspond to a "no" answer should have very negative coefficients. You can also propose meta-concepts that only correspond to a single word. Pick meta-concepts that are as specific as possible, without being too broad.
+
+Words with top coefficients:
+
+{top_features_df}
+
+Answer with a list of {num_meta_concepts} JSONs, one per line:
+{<QUESTION 1>: <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF QUESTION 1>}
+{<QUESTION 2>: <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF QUESTION 2>}
+...
+{<QUESTION {num_meta_concepts}>: <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF QUESTION {num_meta_concepts}>}
+
+Example answer:
+{"Does the note mention the patient having a history of pneumonia?": "pneumonia"}
+{"Does the note mention the patient being uninsured?": "uninsured, insurance"}
+
+Final answer:

@@ -1,0 +1,12 @@
+You will be given a clinical note. I will give you a series of questions. Your task is answer each question with 1 for yes or 0 for no. Respond with a JSON that includes your answer to all of the questions. Questions:
+{prompt_questions}
+
+clinical note:
+{sentence}
+
+Example answer: {
+    "0": 1,
+    "1": 0,
+    "2": 1
+}
+Answer all the questions and do not answer with anything else besides valid JSON. Your answer:

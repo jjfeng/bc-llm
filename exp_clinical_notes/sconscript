@@ -1,0 +1,635 @@
+
+import os
+from os.path import join as path_join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+
+"""
+ZSFG readmissions data which includes discharge summaries, all features used in the model, predicted probabilities, true label for readmission
+NOTE: DO NOT use GPT with this data. It contains PHI.
+"""
+
+Import('env')
+localenv = env.Clone()
+
+# Set up state
+nest = SConsWrap(Nest(), localenv['output'], alias_environment=localenv)
+
+ZSFG_DATA_TABULAR_TRAIN = "exp_clinical_notes/data/non_chf_zsfg_readmission_data_bayesian.csv"
+ZSFG_DATA = 'exp_clinical_notes/data/chf_zsfg_readmission_data_bayesian.csv'
+EXTRACTIONS = 'exp_mimic/_output/short_notes/max_obs_-1/seed_0/gpt-4o-mini/concept_extractions.csv'
+
+TASK_DICT = {
+    "model_revision": {
+        "keep_cols": [
+            "pred_logit_mix"
+            # "pred_logit_nonchf"
+            ]
+    }
+}
+NUM_EPOCHS = 5 # bayesian epochs
+NUM_GREEDY_EPOCHS = 1
+NUM_BOOST_ITERS = 10
+NUM_NEW_TOKENS = 600
+MAX_SECTION_TOKENS = 2500
+
+BOOSTING_PROMPT = 'exp_clinical_notes/prompts/boosting_iter.txt'
+
+EXTRACT_LLM_PROMPT_DICT = {
+    'new': 'exp_clinical_notes/prompts/readmission_descriptors_new.txt'
+}
+
+# DO NOT use GPT
+LLM_MODELS = [
+    "versa-gpt-4o-2024-05-13",
+    # "meta-llama/Meta-Llama-3.1-70B-Instruct"
+]
+LLM_DICT = {
+    "versa-gpt-4o-2024-05-13": {
+        "api": True, # using API
+        "batch_size": 20,
+        "max_extract_length": 2000,
+        "max_binary_extract_length": 4000,
+        "max_new_tokens": 4000,
+        "num_top_resid_words": 40,
+        "llm_iter_model": "gpt-4o-mini",
+    },
+    'meta-llama/Meta-Llama-3.1-70B-Instruct': {
+        "api": False, # False, not using API
+        "batch_size": 5,
+        "max_extract_length": 500,
+        "max_binary_extract_length": 2000,
+        "max_new_tokens": 4000,
+        "num_top_resid_words": 30,
+        "llm_iter_model": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+    }
+} 
+
+CONCEPT_PROMPT_DICT = {
+    "probabilistic": 'exp_mimic/prompts/concept_questions_probabilistic.txt',
+    "baseline_init": "exp_clinical_notes/prompts/baseline_init.txt" 
+}
+
+PROMPT_PRIOR_DICT = {
+    "conditional": 'exp_clinical_notes/prompts/candidate_concept_priors_conditional.txt',
+}
+
+ITER_PROMPTS = {
+  "conditional": 'exp_clinical_notes/prompts/bayesian_iter.txt',
+}
+
+X_DATA_DICT = {
+   "long_notes": 'summary_of_hospitalization',
+   "double_section": 'brief_history_leading_to_hospitalization summary_of_hospitalization'
+}
+
+INIT_CONCEPT_DICT = {
+    'llm_output': 0.01,
+    'spacy_output': 0.01
+}
+
+nest.add('task', [
+    'model_revision'
+    ])
+
+nest.add('x_data', ['double_section'])
+
+nest.add('num_chf', [
+        700
+    ],
+    label_func=lambda c: "max_obs_%d" % c
+)
+
+nest.add('seed', [
+        0
+    ],
+    label_func=lambda c: "seed_%d" % c
+)
+
+@nest.add_target_with_env(localenv)
+def make_notes_data(env, outdir, c):
+    cmd = [
+        'python scripts/assemble_clinical_notes.py',
+        '--seed', c['seed'],
+        '--num-chf', c['num_chf'],
+        '--nonchf-dataset-file', ZSFG_DATA_TABULAR_TRAIN,
+        '--chf-dataset-file', ZSFG_DATA,
+        '--max-section', MAX_SECTION_TOKENS,
+        '--sections-to-keep',
+        X_DATA_DICT[c['x_data']],
+        '--out-csv ${TARGETS[0]}',
+    ]
+
+    targets = [
+        path_join(outdir, 'sectionized_notes_labs_flows.csv')
+    ]
+
+    return env.Command(
+        targets,
+        [],
+        ' '.join(map(str, cmd))
+    )
+
+nest.add('replicate_seed', [
+        1,
+    ],
+    label_func=lambda c: "replicate_seed_%d" % c
+)
+
+nest.add('max_obs', [
+       1500
+    ],
+    label_func=lambda c: "max_obs_%d" % c
+)
+nest.add(
+    'test_frac',
+    [.33335],
+    label_func=lambda c: "test_%.2f" % c)
+
+@nest.add_target_with_env(localenv)
+def train_test_split(env, outdir, c):
+    cmd = [
+        'python scripts/train_test_split.py',
+        '--seed', c['replicate_seed'] + 1,
+        '--max-obs', c['max_obs'],
+        '--data-csv ${SOURCES[0]}', 
+        '--test-frac',
+        c['test_frac'],
+        '--indices-csv ${TARGETS[0]}',
+    ]
+
+    sources = c['make_notes_data']
+    targets = [
+        path_join(outdir, 'train_test_indices.csv'),
+    ]
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+nest.add('llm_model', LLM_MODELS)
+nest.add_aggregate('llm_concept_extract', str)
+
+nest.add(
+    'extraction_prompt',
+    [
+        'new'
+    ])
+
+@nest.add_target_with_env(localenv)
+def extract_llm_output(env, outdir, c):
+    targets = [
+        path_join(outdir, 'log_extract_hierarchy.txt'),
+        path_join(outdir, 'concept_extractions.csv'),
+    ]
+    c['llm_concept_extract'] = targets[1]
+    if os.path.exists(targets[1]):
+        return
+
+    cmd = [
+        'python scripts/extract_llm_concepts.py',
+         f'--seed',
+         0,
+         '--batch-size', LLM_DICT[c['llm_model']]['batch_size'],
+         '--num-new-tokens', LLM_DICT[c['llm_model']]['max_new_tokens'],
+         '--in-dataset-file ${SOURCES[0]}',
+         '--indices-file ${SOURCES[1]}',
+         '--prompt-file', EXTRACT_LLM_PROMPT_DICT[c['extraction_prompt']],
+         '--log-file ${TARGETS[0]}',
+         '--llm-output ${TARGETS[1]}',
+         '--llm-model-type',
+         c['llm_model'],
+         '--use-api' if LLM_DICT[c['llm_model']]['api'] else '',
+         '--max-section-length ', LLM_DICT[c['llm_model']]['max_extract_length'],
+    ]
+
+    sources = [
+        c['make_notes_data'][0],
+        c['train_test_split'][0],
+    ]
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+nest.add(
+    'init_concept_extraction',
+    [
+        # "spacy_output",
+        "llm_output"
+    ]
+)
+nest.add(
+    'keep_col',
+    lambda c: TASK_DICT[c['task']]['keep_cols']
+)
+
+nest.add_aggregate('bayesian_agg', list)
+nest.add_aggregate('result_agg', list)
+
+nest.add(
+    'residual_learner',
+    [
+        "count_l2",
+    ])
+
+nest.add_aggregate('train_baseline_history', str)
+nest.add_aggregate('train_boosting_history', str)
+nest.add(
+    'num_meta_concepts',
+    [4],
+    label_func=lambda c: "num_concepts_%s" % c)
+
+@nest.add_target_with_env(localenv)
+def train_bag_of_words(env, outdir, c):
+    cmd = [
+    'python scripts/train_bag_of_words.py',
+    f'--seed', c['replicate_seed'] + 2,
+    '--learner-type', c['residual_learner'],
+    '--in-dataset-file ${SOURCES[0]}',
+    '--indices-csv ${SOURCES[1]}',
+    '--out-mdl  ${TARGETS[0]}',
+    '--log-file  ${TARGETS[1]}',
+    '--out-vectorizer-file ${TARGETS[2]}'
+    ]
+
+    sources = [
+      c['make_notes_data'][0],
+      c['train_test_split'][0],
+    ]
+    targets = [
+      path_join(outdir, 'bag_of_words_mdl.pkl'),
+      path_join(outdir, 'log_train_bag_of_words.txt'),
+      path_join(outdir, 'bag_of_words_vectorizer.pkl')
+    ]
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+        )
+
+@nest.add_target_with_env(localenv)
+def evaluate_bag_of_words(env, outdir, c):
+    cmd = [
+      'python scripts/evaluate_bag_of_words.py',
+      f'--seed', c['replicate_seed'] + 2,
+      '--learner-type', c['residual_learner'],
+      '--in-dataset-file ${SOURCES[0]}',
+      '--indices-csv ${SOURCES[1]}',
+      '--in-mdl  ${SOURCES[2]}',
+      '--in-vectorizer-file ${SOURCES[3]}',
+      '--results-csv ${TARGETS[0]}'
+    ]
+
+    sources = [
+      c['make_notes_data'][0],
+      c['train_test_split'][0],
+      c['train_bag_of_words'][0],
+      c['train_bag_of_words'][2]
+    ]
+    targets = [
+      path_join(outdir, 'result_bag_of_words.csv')
+    ]
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+        )
+
+@nest.add_target_with_env(localenv)
+def train_baseline(env, outdir, c):
+    cached_extractions = path_join('exp_clinical_notes', outdir, 'baseline_extractions.pkl')
+    cmd = [
+        'python scripts/train_baseline.py',
+        f'--seed',
+        c['replicate_seed'] + 2,
+        '--batch-size', LLM_DICT[c['llm_model']]['batch_size'],
+        '--text-summary', c['init_concept_extraction'],
+        '--num-meta-concepts',
+        c['num_meta_concepts'],
+        '--learner-type', c['residual_learner'],
+        '--prompt-concepts-file', CONCEPT_PROMPT_DICT['probabilistic'],
+        '--in-dataset-file ${SOURCES[0]}',
+        '--indices-csv ${SOURCES[1]}',
+        '--out-training-history-file ${TARGETS[0]}',
+        '--log-file  ${TARGETS[1]}',
+        '--baseline-init-file', CONCEPT_PROMPT_DICT["baseline_init"],
+        '--llm-extraction-type',
+        c['llm_model'],
+        '--llm-iter-type',
+        LLM_DICT[c['llm_model']]['llm_iter_model'],
+        '--use-api' if LLM_DICT[c['llm_model']]['api'] else '',
+        '--out-extractions', cached_extractions,
+        '--init-concepts-file ${SOURCES[2]}',
+        '--max-section-length ', LLM_DICT[c['llm_model']]['max_binary_extract_length'],
+        '--keep-x-cols', c['keep_col'],
+        '--min-prevalence', INIT_CONCEPT_DICT[c['init_concept_extraction']]
+    ]
+
+    sources = [
+        c['make_notes_data'][0],
+        c['train_test_split'][0],
+        c['llm_concept_extract'],
+    ]
+    targets = [
+        path_join(outdir, 'baseline_history_labs_flows.pkl'),
+        path_join(outdir, 'log_train_baseline_labs_flows.txt')
+    ]
+    c['train_baseline_history'] = targets[0]
+    if os.path.exists(targets[0]):
+        return
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+@nest.add_target_with_env(localenv)
+def train_boosting(env, outdir, c):
+    cached_extractions = path_join('exp_clinical_notes', outdir, 'boosting_extractions.pkl')
+    cmd = [
+        'python scripts/train_boosting.py',
+        f'--seed',
+        c['replicate_seed'] + 2,
+        '--num-iters', NUM_BOOST_ITERS,
+        '--batch-size', LLM_DICT[c['llm_model']]['batch_size'],
+        '--boosting-prompt', BOOSTING_PROMPT,
+        '--prompt-concepts-file', CONCEPT_PROMPT_DICT['probabilistic'],
+        '--in-dataset-file ${SOURCES[0]}',
+        '--indices-csv ${SOURCES[1]}',
+        '--out-training-history-file ${TARGETS[0]}',
+        '--log-file  ${TARGETS[1]}',
+        '--llm-model-type', c['llm_model'],
+        '--use-api' if LLM_DICT[c['llm_model']]['api'] else '',
+        '--out-extractions', cached_extractions,
+        '--max-section-length ', LLM_DICT[c['llm_model']]['max_binary_extract_length'],
+        '--keep-x-cols', c['keep_col'],
+        '--num-boost-samples', 2
+    ]
+
+    sources = [
+        c['make_notes_data'][0],
+        c['train_test_split'][0]
+    ]
+    targets = [
+        path_join(outdir, 'boosting_history.pkl'),
+        path_join(outdir, 'log_train_boosting.txt')
+    ]
+    c['train_boosting_history'] = targets[0]
+    if os.path.exists(targets[0]):
+        return
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+nest.add_aggregate('test_extractions', str)
+
+@nest.add_target_with_env(localenv)
+def evaluate_baseline(env, outdir, c):
+    cached_extractions = path_join(outdir, 'test_extractions.pkl')
+    cmd = [
+        'python scripts/evaluate_bayesian.py',
+        f'--seed',
+        c['replicate_seed'] + 5,
+        '--method-name baseline',
+        '--num-posterior-iters',
+        1,
+        '--batch-size',
+        LLM_DICT[c['llm_model']]['batch_size'],
+        '--prompt-concepts-file', CONCEPT_PROMPT_DICT['probabilistic'],
+        '--in-dataset-file ${SOURCES[0]}',
+        '--indices-csv ${SOURCES[1]}',
+        '--training-history-file ${SOURCES[2]}',
+        '--out-extraction', path_join('exp_clinical_notes', cached_extractions),
+        '--log-file ${TARGETS[0]}',
+        '--llm-extraction-type',
+        c['llm_model'],
+        '--llm-iter-type',
+        LLM_DICT[c['llm_model']]['llm_iter_model'],
+        '--use-api' if LLM_DICT[c['llm_model']]['api'] else '',
+        '--calib-plot ${TARGETS[1]}',
+        '--result-csv ${TARGETS[2]}',
+        '--max-section-length ', LLM_DICT[c['llm_model']]['max_binary_extract_length'],
+    ]
+
+    sources = [
+        c['make_notes_data'][0],
+        c['train_test_split'][0],
+        c['train_baseline_history'],
+    ]
+    targets = [
+        path_join(outdir, 'test_baseline_log.txt'),
+        path_join(outdir, 'calib_baseline.png'),
+        path_join(outdir, 'result_baseline.csv'),
+    ]
+    c['test_extractions'] = cached_extractions
+    c['result_agg'].append(targets[2])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+@nest.add_target_with_env(localenv)
+def evaluate_boosting(env, outdir, c):
+    cmd = [
+        'python scripts/evaluate_bayesian.py',
+        f'--seed',
+        c['replicate_seed'] + 5,
+        '--method-name boosting',
+        '--num-posterior-iters',
+        1,
+        '--batch-size',
+        LLM_DICT[c['llm_model']]['batch_size'],
+        '--prompt-concepts-file', CONCEPT_PROMPT_DICT['probabilistic'],
+        '--in-dataset-file ${SOURCES[0]}',
+        '--indices-csv ${SOURCES[1]}',
+        '--training-history-file ${SOURCES[2]}',
+        '--out-extraction ${SOURCES[3]}',
+        '--log-file ${TARGETS[0]}',
+        '--llm-model-type',
+        c['llm_model'],
+        '--use-api' if LLM_DICT[c['llm_model']]['api'] else '',
+        '--result-csv ${TARGETS[1]}',
+        '--max-section-length ', LLM_DICT[c['llm_model']]['max_binary_extract_length'],
+    ]
+
+    sources = [
+        c['make_notes_data'][0],
+        c['train_test_split'][0],
+        c['train_boosting_history'],
+        c['test_extractions'],
+    ]
+    targets = [
+        path_join(outdir, 'test_boosting_log.txt'),
+        path_join(outdir, 'result_boosting.csv'),
+    ]
+    c['result_agg'].append(targets[1])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+nest.add(
+    'proposal_type', # how should the LLM propose concepts in the bayesian procedure
+    [ "conditional" ],
+    label_func=lambda c: "proposal_type_%s" % c)
+
+nest.add(
+    'train_frac',
+    [
+        0.5
+    ],
+    label_func=lambda c: "train_frac_%.2f" % c)
+
+nest.add_aggregate('train_bayesian_history', str)
+@nest.add_target_with_env(localenv)
+def train_bayesian(env, outdir, c):
+    cached_extractions = os.path.join('exp_clinical_notes', outdir, 'extractions.pkl')
+    cmd = [
+        'python scripts/train_bayesian.py',
+        f'--seed',
+        c['replicate_seed'] + 2,
+        '--batch-size', LLM_DICT[c['llm_model']]['batch_size'],
+        '--num-greedy', NUM_GREEDY_EPOCHS,
+        '--max-epochs',
+        NUM_EPOCHS,
+        '--num-restricted-epochs',
+        0,
+        '--num-meta-concepts',
+        c['num_meta_concepts'],
+        '--train-frac', c['train_frac'],
+        '--prompt-iter-type', c['proposal_type'],
+        '--prompt-concepts-file', CONCEPT_PROMPT_DICT['probabilistic'],
+        '--prompt-prior-file', PROMPT_PRIOR_DICT[c['proposal_type']],
+        '--learner-type', c['residual_learner'],
+        '--in-dataset-file ${SOURCES[0]}',
+        '--indices-csv ${SOURCES[2]}',
+        '--out-extraction', cached_extractions,
+        '--log-file ${TARGETS[0]}',
+        '--init-history-file ${SOURCES[1]}',
+        '--training-history-file ${TARGETS[1]}',
+        '--aucs-plot-file ${TARGETS[2]}',
+        '--llm-extraction-type',
+        c['llm_model'],
+        '--llm-iter-type',
+        LLM_DICT[c['llm_model']]['llm_iter_model'],
+        '--use-api' if LLM_DICT[c['llm_model']]['api'] else '',
+        '--prompt-iter-file', ITER_PROMPTS[c['proposal_type']],
+        '--init-concepts-file ${SOURCES[3]}',
+        '--text-summary', c['init_concept_extraction'],
+        '--max-section-length ', LLM_DICT[c['llm_model']]['max_binary_extract_length'],
+        '--max-new-tokens', LLM_DICT[c['llm_model']]['max_new_tokens'],
+        '--num-top', LLM_DICT[c['llm_model']]['num_top_resid_words'],
+        '--keep-x-cols', c['keep_col'],
+        '--min-prevalence', INIT_CONCEPT_DICT[c['init_concept_extraction']]
+    ]
+
+    sources = [
+        c['make_notes_data'][0],
+        c['train_baseline_history'],
+        c['train_test_split'][0],
+        c['llm_concept_extract'],
+    ]
+    targets = [
+        path_join(outdir, 'log_train_bayesian_labs_flows.txt'),
+        path_join(outdir, 'training_history_labs_flows.pkl'),
+        path_join(outdir, 'aucs_labs_flows.png'),
+    ]
+    c['bayesian_agg'].append(targets[1])
+    c['train_bayesian_history'] = targets[1]
+    if os.path.exists(targets[1]):
+        return
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+        )
+
+@nest.add_target_with_env(localenv)
+def evaluate_bayesian(env, outdir, c):
+    cmd = [
+        'python scripts/evaluate_bayesian.py',
+        f'--seed',
+        c['replicate_seed'] + 5,
+        '--method-name', 'bayesian',
+        '--num-posterior-iters',
+        NUM_EPOCHS * c['num_meta_concepts'],
+        '--batch-size',
+        LLM_DICT[c['llm_model']]['batch_size'],
+        '--in-dataset-file ${SOURCES[0]}',
+        '--indices-csv ${SOURCES[1]}',
+        '--training-history-file ${SOURCES[2]}',
+        '--out-extraction ${SOURCES[3]}',
+        '--log-file ${TARGETS[0]}',
+        '--calib-plot ${TARGETS[1]}',
+        '--llm-extraction-type',
+        c['llm_model'],
+        '--llm-iter-type',
+        LLM_DICT[c['llm_model']]['llm_iter_model'], 
+        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--prompt-concepts-file', CONCEPT_PROMPT_DICT['probabilistic'],
+        '--result-csv ${TARGETS[2]}',
+    ]
+
+    sources = [
+        c['make_notes_data'][0],
+        c['train_test_split'][0],
+        c['train_bayesian_history'],
+        c['test_extractions'],
+    ]
+    targets = [
+        path_join(outdir, 'test_bayesian_log_labs_flows.txt'),
+        path_join(outdir, 'calib_bayesian_labs_flows.png'),
+        path_join(outdir, 'result_bayesian_labs_flows.csv'),
+    ]
+    c['result_agg'].append(targets[2])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+
+@nest.add_target_with_env(localenv)
+def plot_bayesian_agg(env, outdir, c):
+    cmd = [
+        'python scripts/plot_exp_clinical_notes.py',
+        f'--seed',
+        c['seed'] + 15,
+        '--num-posterior-iters',
+        (NUM_EPOCHS - 1) * 6,
+        '--history-file ${SOURCES[0]}',
+        '--extraction-file ${SOURCES[1]}',
+        '--plot ${TARGETS[0]}',
+        '--concepts-csv ${TARGETS[1]}',
+    ]
+    sources = [
+        c['train_bayesian_history'],
+        c['test_extractions'],
+    ]
+    targets = [
+        path_join(outdir, 'bayesian_hier.png'),
+        path_join(outdir, 'concepts.csv'),
+    ]
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )

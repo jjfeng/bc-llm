@@ -1,0 +1,23 @@
+We are fitting a concept bottleneck model (CBM) to predict 30-day unplanned readmission in congestive heart failure patients. Your goal is to help construct a CBM that extracts {num_concepts} meta-concepts to predict if a patient will be readmitted. A meta-concept is a binary feature extractor defined by a yes/no question. We have {num_concepts_fixed} meta-concepts so far:
+{meta_concepts}
+So far, we've fit a concept bottleneck model to predict readmissions using only the {num_concepts_fixed} existing meta-concepts. We are planning to add one of the following candidate meta-concepts to the CBM to predict readmission:
+{candidate_list}
+
+Assign a non-zero prior probability for each of the candidate meta-concepts. To help come up with a prior probability, we have used an LLM to summarize each note and fit a bag-of-words model on the summaries to predict the residuals. These are the top features in the residual model, in descending order of importance:
+
+{top_features_df}
+
+Note if two candidate meta-concepts are the same, they should be assigned the same prior probability.
+
+Summarize all the candidate meta-concepts with non-zero prior probabilities at the end with a valid JSON, formatted as follows:
+{
+    "0": <PRIOR_PROBABILITY>,
+    "1": <PRIOR_PROBABILITY>,
+    ...
+}
+Example:
+{
+    "0": 0.1,
+    "1": 0.4,
+    ...
+}

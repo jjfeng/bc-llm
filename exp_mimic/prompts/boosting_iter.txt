@@ -1,0 +1,19 @@
+Below we are given samples from a clinical dataset with accompanying labels. Our ultimate goal is to fit a concept bottleneck model to predict the label.
+Concepts should be yes/no questions. Good concepts are those that help us predict the label accurately. Do not propose concepts that are simply a union of two different concepts (e.g. "Does the note mention the patient experiencing stomach pain or being female?" is not allowed), questions with answers that are almost always a yes or almost always a no (e.g. the answer to "Does the note mention this patient being sick?" is almost always yes, and so should be excluded), or questions where the yes/no options are not clearly defined (e.g. "Does the note mention this patient experiencing difficulty?" is not clearly defined because difficulty may mean financial difficulty, physical difficulties, etc). Do not propose concepts that already exist.
+
+To brainstorm concepts, below are samples from the dataset with labels
+{examples}
+
+These are existing concepts already, so avoid proposing the same ones:
+{existing concepts}
+
+The following concepts have been rejected by the system, so avoid proposing the same ones:
+{rejected concepts}
+
+Keeping in mind the above, generate a new concept in JSON in the following format:  
+{"concept": "<NEW CANDIDATE CONCEPT>"}
+
+Example:
+{"concept": "Does the note mention this patient having a history of pneumonia?"}
+
+Your answer:      
