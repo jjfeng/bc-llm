@@ -12,11 +12,12 @@ import torch
 import numpy as np
 import pandas as pd
 import scipy
+from itertools import chain
 
 import transformers
 from transformers.pipelines.pt_utils import KeyDataset
 from transformers import AutoTokenizer
-from datasets import Dataset
+from nltk.corpus import wordnet as wn
 
 sys.path.append(os.getcwd())
 
@@ -25,7 +26,6 @@ from src.llm.llm_api import LLMApi
 from src.llm.llm_local import LLMLocal
 from src.llm.dataset import TextDataset, ImageDataset
 import src.common as common
-
 
 def parse_args(args):
     """parse command line arguments"""
@@ -124,12 +124,18 @@ def main(args):
         for grp_id in np.unique(group_ids[:tot_num_llm_outs]):
             match_idxs = np.where(group_ids == grp_id)[0]
             try:
-                grp_llm_output = ','.join([",".join(list(convert_to_json(llm_outputs[match_idx]).values(
-                ))) for match_idx in match_idxs if match_idx < tot_num_llm_outs])
-
+                grouped_words = []
+                for match_idx in match_idxs:
+                    if match_idx < tot_num_llm_outs:
+                        words = list(convert_to_json(llm_outputs[match_idx]).values())
+                        synonyms = [list(chain.from_iterable(wn.synonyms(word))) for word in words]
+                        synonyms = [syn for list_syn in synonyms for syn in list_syn]
+                        synonyms = [word.lower().replace("_", " ") for word in synonyms]
+                        uniq_words = list(set(words + synonyms))
+                        grouped_words.append(", ".join(uniq_words))
+                grp_llm_output = ",".join(grouped_words)
             except Exception as e:
-                # print(e)
-                # breakpoint()
+                print(e)
                 grp_llm_output = ''
             grp_llm_output_list.append(grp_llm_output)
 
