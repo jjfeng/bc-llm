@@ -13,15 +13,18 @@ import numpy as np
 import pandas as pd
 import scipy
 from itertools import chain
+import duckdb
 
 import transformers
 from transformers.pipelines.pt_utils import KeyDataset
 from transformers import AutoTokenizer
 from nltk.corpus import wordnet as wn
+from sentence_transformers import SentenceTransformer
+import faiss 
 
 sys.path.append(os.getcwd())
 
-from src.utils import convert_to_json
+from src.utils import convert_to_json, to_sql_str
 from src.llm.llm_api import LLMApi
 from src.llm.llm_local import LLMLocal
 from src.llm.dataset import TextDataset, ImageDataset
@@ -47,6 +50,11 @@ def parse_args(args):
                         help="the number of new tokens to generate")
     parser.add_argument("--use-api", action="store_true")
     parser.add_argument("--max-section-length", type=int, default=None)
+    parser.add_argument("--database-file", type=str, default="bc_llm_database.db")
+    parser.add_argument("--embeddings-file", type=str, default="concept_embeddings.bin")
+    # NOTE: Please use the same embedding model as was used in create_concept_bank
+    parser.add_argument("--embedding-model", type=str, choices=["google-bert/bert-base-uncased"], default="google-bert/bert-base-uncased",
+                        help="the model to use for computing embeddings")
     parser.add_argument(
         "--llm-model-type",
         type=str,
@@ -70,6 +78,10 @@ def main(args):
     logging.info(args)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+
+    model = SentenceTransformer(args.embedding_model)
+    index = faiss.read_index(args.embeddings_file)
+    db = duckdb.connect(args.database_file)
 
     if os.path.exists(args.llm_outputs_file):
         data_df = pd.read_csv(args.llm_outputs_file, header=0)
@@ -118,7 +130,22 @@ def main(args):
             text_to_replace="{note}",
         )
 
-    def write_llm_outputs(llm_outputs):
+    def get_other_concepts(model, index, db, words, k=3):
+        word_embd = model.encode(words)
+        faiss.normalize_L2(word_embd)
+        _, I = index.search(word_embd, k)
+        idxs_str = to_sql_str(chain.from_iterable(I))
+        query = f"""
+            SELECT text
+            FROM concept_bank
+            WHERE idx IN {idxs_str}
+        """
+        closest_words_df = db.execute(query).df()
+        closest_words = list(closest_words_df.text.values)
+        return list(set(words + closest_words))
+
+    # number of synonyms per word to keep
+    def write_llm_outputs(llm_outputs, num_synonyms=3):
         tot_num_llm_outs = len(llm_outputs)
         grp_llm_output_list = []
         for grp_id in np.unique(group_ids[:tot_num_llm_outs]):
@@ -129,9 +156,12 @@ def main(args):
                     if match_idx < tot_num_llm_outs:
                         words = list(convert_to_json(llm_outputs[match_idx]).values())
                         synonyms = [list(chain.from_iterable(wn.synonyms(word))) for word in words]
-                        synonyms = [syn for list_syn in synonyms for syn in list_syn]
+                        synonyms = [syn for list_syn in synonyms for syn in list_syn[:num_synonyms]]
                         synonyms = [word.lower().replace("_", " ") for word in synonyms]
-                        uniq_words = list(set(words + synonyms))
+                        closest_words = get_other_concepts(model, index, db, words)
+
+                        uniq_words = list(set(words + synonyms + closest_words))
+                        breakpoint()
                         grouped_words.append(", ".join(uniq_words))
                 grp_llm_output = ",".join(grouped_words)
             except Exception as e:

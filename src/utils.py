@@ -1,9 +1,9 @@
 import ast
 import regex
 import re
-
 import numpy as np
 
+to_sql_str = lambda data: "(" + ",".join(["'%s'" % e for e in data]) + ")"
 
 def _process_to_valid_json(s):
     """

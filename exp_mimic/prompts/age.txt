@@ -1,6 +1,6 @@
 Here is a clinical note:
 "{note}"
-Output a list of descriptors that summarizes the patient case (such as aspects on demographics, diagnoses, SDOH, etc). Output as a JSON in the following format where each value is a one word descriptor. Do not output more than 30 entries in the JSON:
+Output a list of descriptors that summarizes the patient case (such as aspects on demographics, diagnoses, SDOH, etc). Output as a JSON in the following format where each value is a one word descriptor. Do not output more than 5 entries in the JSON:
 {
 "1": "<STRING_OF_DESCRIPTOR1>",
 "2": "<STRING_OF_DESCRIPTOR2>",
