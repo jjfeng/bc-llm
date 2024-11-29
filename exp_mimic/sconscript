@@ -39,13 +39,15 @@ NUM_NEW_TOKENS = 600
 BATCH_SIZE = 8
 
 LLM_MODELS = [
-    'gpt-4o-mini'
+    "claude-haiku"
+    # 'gpt-4o-mini'
     # "meta-llama/Meta-Llama-3.1-8B-Instruct"
     # "meta-llama/Meta-Llama-3.1-70B-Instruct"
     # 'meta-llama/Llama-3.2-11B-Vision-Instruct'
 ]
 LLM_DICT = {
-    'gpt-4o-mini': True,  # true using API
+    "claude-haiku": True
+    # 'gpt-4o-mini': True,  # true using API
     # 'meta-llama/Meta-Llama-3.1-8B-Instruct': False,  # False, not using API
     # 'meta-llama/Meta-Llama-3.1-70B-Instruct': False, # False, not using API
     # 'meta-llama/Llama-3.2-11B-Vision-Instruct': False,

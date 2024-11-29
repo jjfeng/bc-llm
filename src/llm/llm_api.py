@@ -4,8 +4,11 @@ import transformers
 from dotenv import load_dotenv
 from tqdm import tqdm
 import os
+import aioboto3
 import asyncio
 import base64
+import json
+import boto3
 
 from torch.utils.data import Dataset
 
@@ -21,6 +24,8 @@ OpenAI models
 
 OPENAI_MODELS = ["gpt-4o-mini", "gpt-4o"]
 VERSA_MODELS = ["versa-gpt-4o-2024-05-13"]
+BEDROCK_MODELS = ["claude-haiku"]
+CLAUDE_HAIKU_MODEL_ID="anthropic.claude-3-5-haiku-20241022-v1:0"
 
 class LLMApi(LLM):
     def __init__(self,
@@ -34,6 +39,7 @@ class LLMApi(LLM):
         load_dotenv()
         self.api_model_name = model_type.replace("versa-", "")
         self.is_openai = model_type in OPENAI_MODELS + VERSA_MODELS
+        self.is_bedrock = model_type in BEDROCK_MODELS 
         self.timeout = timeout
         self.is_api = True
 
@@ -49,6 +55,15 @@ class LLMApi(LLM):
                 api_key=self.api_key,
                 api_version=self.api_version,
                 azure_endpoint=self.resource_endpoint,
+            )
+        elif self.model_type in BEDROCK_MODELS:
+            access_key = os.getenv("BEDROCK_ACCESS_KEY")
+            secret_access_key = os.getenv("BEDROCK_ACCESS_TOKEN")
+            return boto3.client(
+                'bedrock',
+                region_name='us-east-1',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_access_key
             )
         else:
             self.access_token = os.getenv('HF_ACCESS_TOKEN')
@@ -71,6 +86,15 @@ class LLMApi(LLM):
                 api_key=self.api_key,
                 api_version=self.api_version,
                 azure_endpoint=self.resource_endpoint,
+            )
+        elif self.model_type in BEDROCK_MODELS:
+            access_key = os.getenv("BEDROCK_ACCESS_KEY")
+            secret_access_key = os.getenv("BEDROCK_ACCESS_TOKEN")
+            return aioboto3.client(
+                'bedrock',
+                region_name='us-east-1',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_access_key
             )
         else:
             self.access_token = os.getenv('HF_ACCESS_TOKEN')
@@ -106,6 +130,47 @@ class LLMApi(LLM):
                         seed=self.seed,
                         model=self.api_model_name
                         )
+            llm_response = llm_output.choices[0].message.content
+        # TODO: change args to take in optional content image and input text for prompt
+        elif self.is_bedrock and "claude" in self.model_type and is_image:
+            payload = {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": max_tokens,
+                    "seed": self.seed,
+                    {"role": "user",
+                     "content": [
+                         {"type": "image", 
+                          "source": {
+                              "type": "base64",
+                              "media_type": "image/jpeg", 
+                              "data": content_image
+                              }
+                          },
+                         {"type": "text", "text": input_text}
+                         ]}
+                     }
+            response = client.invoke_model(
+                    modelId=CLAUDE_HAIKU_MODEL_ID,
+                    body=json.dumps(payload)
+                    )
+            result = json.loads(response["body"].read())
+            llm_response = "".join([output["text"] for output in result["content"]])
+        elif self.is_bedrock and "claude" in self.model_type:
+            payload = {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": max_tokens,
+                    "seed": self.seed,
+                    "system": "You are a helpful assistant",
+                    "messages": [
+                        {"role": "user", "content": [{ "type": "text", "text": prompt }]}
+                        ]
+                    }
+            response = client.invoke_model(
+                    modelId=CLAUDE_HAIKU_MODEL_ID,
+                    body=json.dumps(payload)
+                    )
+            result = json.loads(response["body"].read())
+            llm_response = "".join([output["text"] for output in result["content"]])
         else:
             llm_output = client.chat_completion(
                     [
@@ -115,7 +180,7 @@ class LLMApi(LLM):
                     max_tokens=max_new_tokens,
                     seed=self.seed
                     )
-        llm_response = llm_output.choices[0].message.content
+            llm_response = llm_output.choices[0].message.content
         self.logging.info("LLM response %s", llm_response)
         return llm_response
 
@@ -205,8 +270,31 @@ class LLMApi(LLM):
                     seed=self.seed,
                     temperature=temperature,
                     )
+        elif self.is_bedrock and "claude" in self.model_type and is_image:
+            payload = {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": max_tokens,
+                    "seed": self.seed,
+                    "temperature": temperature,
+                    {"role": "user",
+                     "content": [
+                         {"type": "image", 
+                          "source": {
+                              "type": "base64",
+                              "media_type": "image/jpeg", 
+                              "data": content_image
+                              }
+                          },
+                         {"type": "text", "text": input_text}
+                         ]}
+                     }
+            async with client as async_client:
+                llm_output = async_client.invoke_model(
+                        modelId=CLAUDE_HAIKU_MODEL_ID,
+                        body=json.dumps(payload)
+                        )
         else:
-            raise Exception("Images are only supported for OpenAI models")
+            raise Exception("Images are only supported for OpenAI and Claude models")
 
         return await llm_output
 
@@ -222,6 +310,22 @@ class LLMApi(LLM):
                     seed=self.seed,
                     temperature=temperature,
                     )
+        elif self.is_bedrock and "claude" in self.model_type:
+            payload = {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": max_tokens,
+                    "seed": self.seed,
+                    "temperature": temperature,
+                    "system": "You are a helpful assistant",
+                    "messages": [
+                        {"role": "user", "content": [{ "type": "text", "text": prompt }]}
+                        ]
+                    }
+            async with client as async_client:
+                llm_output = async_client.invoke_model(
+                        modelId=CLAUDE_HAIKU_MODEL_ID,
+                        body=json.dumps(payload)
+                        )
         else:
             llm_output = client.chat_completion(
                     [
