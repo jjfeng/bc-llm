@@ -52,6 +52,11 @@ def parse_args(args):
         type=str,
         default="meta-llama/Meta-Llama-3.1-8B-Instruct",
         choices=[
+                "cohere-command",
+                "cohere-command-light",
+                "claude-sonnet",
+                "claude-haiku-3.5",
+                "claude-haiku-3",
                 "versa-gpt-4o-2024-05-13",
                 "gpt-4o-mini",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct",

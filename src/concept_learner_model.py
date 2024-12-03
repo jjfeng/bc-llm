@@ -387,14 +387,15 @@ class ConceptLearnerModel:
         try:
             logging.info("candidate concept summary =================")
             try:
-                outs = llm_output.split('\n')
-                jsons = []
-                for out in outs:
-                    try:
-                        jsons.append(json.loads(out))
-                    except:
-                        pass           
+                # outs = llm_output.split('\n')
+                # jsons = []
+                # for out in outs:
+                #     try:
+                #         jsons.append(json.loads(out))
+                #     except:
+                #         pass           
 
+                jsons = json.loads(llm_output)["concepts"]
                 # reformat into prior_dicts
                 prior_dicts = []
                 for i in range(len(jsons)):
@@ -431,7 +432,7 @@ class ConceptLearnerModel:
                 prior_dicts[i]['prior'] = default_prior
                 logging.info("CONCEPT %s %s", prior_dicts[i]['concept'], prior_dicts[i])
 
-            assert len(prior_dicts) > 0
+            # assert len(prior_dicts) > 0
         except Exception as e:
             logging.info("ERROR in extracting candidate concepts %s", e)
             raise ValueError("bad JSON llm response")

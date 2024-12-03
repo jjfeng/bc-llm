@@ -46,6 +46,9 @@ def parse_args(args):
             type=str,
             default=None,
             choices=[
+                "cohere-command-r",
+                "cohere-command",
+                "cohere-command-light",
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
@@ -58,6 +61,9 @@ def parse_args(args):
             type=str,
             default=None,
             choices=[
+                "cohere-command-r",
+                "cohere-command",
+                "cohere-command-light",
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
@@ -70,6 +76,9 @@ def parse_args(args):
             type=str,
             default=None,
             choices=[
+                "cohere-command-r",
+                "cohere-command",
+                "cohere-command-light",
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 

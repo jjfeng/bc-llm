@@ -47,10 +47,15 @@ MAX_TRAIN_OBS = 2000
 NUM_TEST_OBS = 500
 
 LLM_MODELS = [
+    "cohere-command-light",
+    # "claude-haiku-3",
     # "meta-llama/Meta-Llama-3.1-70B-Instruct"
-    'gpt-4o-mini'
+    #'gpt-4o-mini'
 ]
 LLM_DICT = {
+    "cohere-command-light": True,
+    "claude-haiku-3": True, # true using API
+    "claude-haiku-3": True, # true using API
     'gpt-4o-mini': True, # true using API
     'meta-llama/Meta-Llama-3.1-70B-Instruct': False, # False, not using API
 }
@@ -58,16 +63,16 @@ LLM_DICT = {
 nest.add_aggregate('res_agg_birds', list)
 nest.add('task', [
     'class_1_2_3',  # Albatross -- DONE
-    'class_5_6_7_8',  # Auklet -- DONE
-    'class_9_10_11_12',  # Blackbird -- DONE
-    'class_14_15_16',  # Bunting -- DONE
+    # 'class_5_6_7_8',  # Auklet -- DONE
+    # 'class_9_10_11_12',  # Blackbird -- DONE
+    # 'class_14_15_16',  # Bunting -- DONE
     # 'class_18_19',  # Catbird
     # 'class_23_24_25',  # Cormorant
     # 'class_26_27',  # Cowbird
     # 'class_29_30',  # Crow
     # 'class_31_32_33',  # Cuckoo
     # 'class_34_35',  # Finch
-    'class_37_38_39_40_41_42_43',  # Flycatcher -- DONE (actually only 0.75 not 0.5 train bayesian)
+    # 'class_37_38_39_40_41_42_43',  # Flycatcher -- DONE (actually only 0.75 not 0.5 train bayesian)
     # 'class_47_48',  # Goldfinch
     # 'class_50_51_52_53',  # Grebe
     # 'class_54_55_56_57',  # Grosbeak
@@ -80,10 +85,10 @@ nest.add('task', [
     # 'class_95_96_97_98',  # Oriole
     # 'class_107_108',  # Raven
     # 'class_111_112',  # Shrike
-    'class_113_114_115_116_117_118_119_120_121_122_123_124_125_126_127_128_129_130_131_132_133',  # Sparrow -- DONE
+    # 'class_113_114_115_116_117_118_119_120_121_122_123_124_125_126_127_128_129_130_131_132_133',  # Sparrow -- DONE
     # 'class_135_136_137_138',  # Swallow
     # 'class_139_140',  # Tanager
-    'class_141_142_143_144_145_146_147',  # Tern -- DONE
+    # 'class_141_142_143_144_145_146_147',  # Tern -- DONE
     # 'class_149_150',  # Thrasher
     # 'class_151_152_153_154_155_156_157',  # Vireo
     # 'class_158_159_160_161_162_163_164_165_166_167_168_169_170_171_172_173_174_175_176_177_178_179_180_181_182',  # Warbler
@@ -365,7 +370,7 @@ def evaluate_baseline(env, outdir, c):
     ]
     targets = [
         path_join(outdir, 'test_baseline_log.txt'),
-        # path_join(outdir, 'test_extractions.pkl'),
+        path_join(outdir, 'test_extractions.pkl'),
         path_join(outdir, 'calib_baseline.png'),
         path_join(outdir, 'result_baseline.csv'),
     ]

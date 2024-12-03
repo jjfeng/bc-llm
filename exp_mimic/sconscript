@@ -39,14 +39,18 @@ NUM_NEW_TOKENS = 600
 BATCH_SIZE = 8
 
 LLM_MODELS = [
-    "claude-haiku"
+    "cohere-command",
+    # "cohere-command-light",
+    # "claude-haiku-3.5"
     # 'gpt-4o-mini'
     # "meta-llama/Meta-Llama-3.1-8B-Instruct"
     # "meta-llama/Meta-Llama-3.1-70B-Instruct"
     # 'meta-llama/Llama-3.2-11B-Vision-Instruct'
 ]
 LLM_DICT = {
-    "claude-haiku": True
+    "cohere-command": True,
+    # "cohere-command-light": True,
+    # "claude-haiku-3.5": True
     # 'gpt-4o-mini': True,  # true using API
     # 'meta-llama/Meta-Llama-3.1-8B-Instruct': False,  # False, not using API
     # 'meta-llama/Meta-Llama-3.1-70B-Instruct': False, # False, not using API
@@ -263,9 +267,9 @@ nest.add_aggregate('bayesian_agg', list)
 nest.add_aggregate('extraction_agg', list)
 nest.add('max_train_obs', [
     100,
-    200,
-    400,
-    800,
+#     200,
+#     400,
+#     800,
 ],
     label_func=lambda c: "train_%d" % c
 )

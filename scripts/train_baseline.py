@@ -31,8 +31,8 @@ def parse_args(args):
     parser.add_argument("--text-summary-column", type=str, default="llm_output", choices=['llm_output', 'sentence', 'spacy_output'])
     parser.add_argument("--max-section-length", type=int, default=None)
     parser.add_argument("--learner-type", type=str, default="count_l2", choices=['count_elasticnet','tfidf_l2', 'tfidf_l1', 'count_l2', 'count_l1'], help="model types")
-    parser.add_argument("--baseline-init-file", type=str, default="exp_multi_concept/prompts/baseline_init.txt")
-    parser.add_argument("--prompt-concepts-file", type=str, default="exp_multi_concept/prompts/concept_questions.txt")
+    parser.add_argument("--baseline-init-file", type=str, default="exp_mimic/prompts/baseline_init.txt")
+    parser.add_argument("--prompt-concepts-file", type=str, default="exp_mimic/prompts/concept_questions.txt")
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--in-training-history-file", type=str, default=None)
     parser.add_argument("--out-training-history-file", type=str, default=None)
@@ -44,6 +44,10 @@ def parse_args(args):
             type=str,
             default=None,
             choices=[
+                "cohere-command-r",
+                "cohere-command",
+                "cohere-command-light",
+                "claude-sonnet",
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
@@ -56,6 +60,9 @@ def parse_args(args):
             type=str,
             default=None,
             choices=[
+                "cohere-command-r",
+                "cohere-command-light",
+                "claude-sonnet",
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
@@ -68,6 +75,10 @@ def parse_args(args):
             type=str,
             default=None,
             choices=[
+                "cohere-command-r",
+                "cohere-command",
+                "cohere-command-light",
+                "claude-sonnet",
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
