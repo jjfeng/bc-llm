@@ -110,6 +110,7 @@ def split_sentences_by_id(
         ids = []
         for idx, row in dset_train.iterrows():
             sentence = row.sentence
+            # failing on this line. Not sure why
             if len(sentence) > max_section_length:
                 for start in range(0, len(sentence), max_section_length):
                     end = min(start + max_section_length, len(sentence))
