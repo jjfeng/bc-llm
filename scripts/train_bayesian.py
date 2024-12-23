@@ -24,6 +24,7 @@ from src.llm.llm_api import LLMApi
 from src.llm.llm_local import LLMLocal
 from src.training_history import TrainingHistory
 import src.common as common
+from src.llm.constants import *
 
 def parse_args(args):
     """parse command line arguments"""
@@ -65,37 +66,19 @@ def parse_args(args):
             "--llm-model-type",
             type=str,
             default=None,
-            choices=[
-                "gpt-4o-mini",
-                "versa-gpt-4o-2024-05-13",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-                "meta-llama/Llama-3.2-11B-Vision-Instruct" 
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     parser.add_argument(
             "--llm-iter-type",
             type=str,
             default=None,
-            choices=[
-                "gpt-4o-mini",
-                "versa-gpt-4o-2024-05-13",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-                "meta-llama/Llama-3.2-11B-Vision-Instruct" 
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     parser.add_argument(
             "--llm-extraction-type",
             type=str,
             default=None,
-            choices=[
-                "gpt-4o-mini",
-                "versa-gpt-4o-2024-05-13",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-                "meta-llama/Llama-3.2-11B-Vision-Instruct" 
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     args = parser.parse_args()
     args.partition = "train"

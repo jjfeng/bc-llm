@@ -22,7 +22,6 @@ sys.path.append(os.getcwd())
 
 from src.utils import convert_to_json
 from src.llm.llm_api import LLMApi
-from src.llm.llm_api_new import LLMApiNew
 from src.llm.constants import *
 from src.llm.llm_local import LLMLocal
 from src.llm.dataset import TextDataset, ImageDataset
@@ -134,7 +133,7 @@ def main(args):
         data_df.to_csv(args.llm_outputs_file, index=False)
 
     if args.use_api:
-        llm = LLMApiNew(args.seed, args.llm_model_type, logging)
+        llm = LLMApi(args.seed, args.llm_model_type, logging)
         llm_outputs = asyncio.run(llm.get_outputs(
             dataset,
             max_new_tokens=args.num_new_tokens,

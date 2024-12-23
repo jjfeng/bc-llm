@@ -1,122 +1,84 @@
-from huggingface_hub import InferenceClient, AsyncInferenceClient
-from openai import AsyncOpenAI, OpenAI, AzureOpenAI, AsyncAzureOpenAI
-import transformers
+from src.llm.llm import LLM
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage
+from langchain_aws.chat_models.bedrock_converse import ChatBedrockConverse
+from torch.utils.data import Dataset
 from dotenv import load_dotenv
 from tqdm import tqdm
 import os
 import asyncio
 import base64
-
-from torch.utils.data import Dataset
-
-from src.llm.llm import LLM
-from torch.utils.data import DataLoader
 import time
 
+from src.llm.llm import LLM
+from src.llm.constants import *
+from src.llm.chat_versa import ChatVersa
+from torch.utils.data import DataLoader
 
 """
-Please set your HF and OpenAI tokens in a .env file. Note: The API currently only supports image inference for
+Please set your HF, OpenAI, and Versa tokens in a .env file. Note: The API currently only supports image inference for
 OpenAI models
 """
-
-OPENAI_MODELS = ["gpt-4o-mini", "gpt-4o"]
-VERSA_MODELS = ["versa-gpt-4o-2024-05-13"]
 
 class LLMApi(LLM):
     def __init__(self,
                  seed: int,
-                 model_type:str,
+                 model_type: str,
                  logging,
-                 timeout=60 # seconds
+                 timeout=60
                  ):
         super().__init__(seed, model_type, logging)
 
         load_dotenv()
         self.api_model_name = model_type.replace("versa-", "")
-        self.is_openai = model_type in OPENAI_MODELS + VERSA_MODELS
         self.timeout = timeout
         self.is_api = True
 
-    def get_client(self):
+    def get_client(self, max_new_tokens=5000, temperature=0):
         if self.model_type in OPENAI_MODELS:
-            self.access_token = os.getenv("OPENAI_ACCESS_TOKEN")
-            return OpenAI(api_key=self.access_token, timeout=self.timeout)
-        elif self.model_type in VERSA_MODELS:
-            self.api_key = os.environ.get('VERSA_API_KEY')
-            self.api_version = os.environ.get('VERSA_API_VERSION')
-            self.resource_endpoint = os.environ.get('VERSA_RESOURCE_ENDPOINT')
-            return AzureOpenAI(
-                api_key=self.api_key,
-                api_version=self.api_version,
-                azure_endpoint=self.resource_endpoint,
-            )
-        else:
-            self.access_token = os.getenv('HF_ACCESS_TOKEN')
-            return InferenceClient(
-                model=self.model_type, 
-                token=self.access_token,
-                timeout=self.timeout
-                )
-
-    def get_async_client(self):
-        if self.model_type in OPENAI_MODELS:
-            self.access_token = os.getenv("OPENAI_ACCESS_TOKEN")
-            return AsyncOpenAI(api_key=self.access_token, timeout=self.timeout)
-        elif self.model_type in VERSA_MODELS:
-            self.api_key = os.environ.get('VERSA_API_KEY')
-            self.api_version = os.environ.get('VERSA_API_VERSION')
-            self.resource_endpoint = os.environ.get('VERSA_RESOURCE_ENDPOINT')
-            return AsyncAzureOpenAI(
-                api_key=self.api_key,
-                api_version=self.api_version,
-                azure_endpoint=self.resource_endpoint,
-            )
-        else:
-            self.access_token = os.getenv('HF_ACCESS_TOKEN')
-            return AsyncInferenceClient(
-                    model=self.model_type, 
-                    token=self.access_token, 
+            access_token = os.getenv("OPENAI_ACCESS_TOKEN")
+            return ChatOpenAI(
+                    api_key=access_token, 
+                    model_name=self.model_type,
+                    max_tokens=max_new_tokens,
+                    temperature=temperature,
+                    seed=self.seed,
                     timeout=self.timeout
                     )
-    
+        elif self.model_type in VERSA_MODELS:
+            api_key = os.environ.get('VERSA_API_KEY')
+            return ChatVersa(
+                    model_name=self.model_type,
+                    api_key=api_key,
+                    max_tokens=max_new_tokens,
+                    temperature=temperature,
+                    timeout=self.timeout,
+                    seed=self.seed
+                    )
+        elif self.model_type in BEDROCK_MODELS:
+            access_key = os.getenv("BEDROCK_ACCESS_KEY")
+            secret_access_key = os.getenv("BEDROCK_ACCESS_TOKEN")
+            return ChatBedrockConverse(
+                    aws_access_key_id=access_key,
+                    aws_secret_access_key=secret_access_key,
+                    region_name=AWS_REGION,
+                    max_tokens=max_new_tokens,
+                    temperature=temperature,
+                    model_id=self._get_model_id()
+                    )
+
     # Note: if passing in an image here the prompt should contain the base64 encoded image.
     # see _encode_images for an example
     def get_output(self, prompt, max_new_tokens=5000, is_image=False) -> str:
         self.logging.info("LLM (%s) prompt %s", self.model_type, prompt)
-        client = self.get_client()
-        if self.is_openai:
-            if is_image:
-                llm_output = client.chat.completions.create(
-                        messages=[
-                            {"role": "system", "content": "You are a helpful assistant"},
-                            {"role": "user", "content": prompt},
-                            ],
-                        model=self.api_model_name,
-                        max_tokens=max_new_tokens,
-                        seed=self.seed
-                        )
-            else:
-                llm_output = client.chat.completions.create(
-                        messages=[
-                            {"role": "system", "content": "You are a helpful assistant"},
-                            {"role": "user", "content": prompt},
-                        ],
-                        max_tokens=max_new_tokens,
-                        seed=self.seed,
-                        model=self.api_model_name
-                        )
+        llm = self.get_client(max_new_tokens, temperature)
+        if is_image:
+            raise Exception
         else:
-            llm_output = client.chat_completion(
-                    [
-                        {"role": "system", "content": "You are a helpful assistant"},
-                        {"role": "user", "content": prompt},
-                    ],
-                    max_tokens=max_new_tokens,
-                    seed=self.seed
-                    )
-        llm_response = llm_output.choices[0].message.content
-        self.logging.info("LLM response %s", llm_response)
-        return llm_response
+            response = llm.invoke(prompt)
+
+        self.logging.info("LLM response %s", response)
+        return response
 
     async def get_outputs(
             self, 
@@ -128,9 +90,8 @@ class LLMApi(LLM):
             temperature:float = 1,
             callback = None,
             validation_func = None
-            ) -> list[str]:
-        self.logging.info(f"async LLM: {self.model_type}")
-        client = self.get_async_client()
+            ):
+        llm = self.get_client(max_new_tokens, temperature)
         if is_image:
             # the collate_fn is used here because passing in the full payload with the base encoded image causing
             # dataloader to break. The image is encoded into base64 after the batch is created
@@ -146,15 +107,12 @@ class LLMApi(LLM):
             num_retries = 0
             while not got_result and (num_retries < max_retries):
                 try: 
-                    batch_results = []
-                    for prompt in batch_prompts:
-                        if is_image:
-                            batch_results.append(self._run_async_image(client, prompt, max_new_tokens, temperature=temperature))
-                        else:
-                            batch_results.append(self._run_async_inference(client, prompt, max_new_tokens, temperature=temperature))
-                    batch_results = await asyncio.gather(*batch_results)
-                    batch_results = [llm_output.choices[0].message.content for llm_output in batch_results]
-                    assert len(batch_results) == len(batch_prompts)
+                    if is_image:
+                        batch_results = await self._run_images(llm, batch_prompts)
+                    else:
+                        batch_results = await llm.abatch(batch_prompts)
+
+                    batch_results = [response.content for response in batch_results]
                     if validation_func is not None:
                         validation_func(batch_results)
                     self.logging.info(batch_results)
@@ -170,9 +128,10 @@ class LLMApi(LLM):
                     self.logging.error(message)
                     if num_retries == max_retries:
                         raise ValueError("Error with LLM batch query")
+
         end_time = time.time()
         execution_time = end_time - start_time
-        message = f"Results took {execution_time} seconds"
+        self.logging.info("Results took {execution_time} seconds")
         self.logging.info("NUM RESULTS %d", len(results))
         assert len(results) == len(dataset)
         return results
@@ -192,42 +151,25 @@ class LLMApi(LLM):
             updated_payloads.append(payload)
         return updated_payloads
 
-    async def _run_async_image(self, client, prompt, max_new_tokens, temperature: float = 1):
-        if self.is_openai:
-            llm_output = client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant"},
-                        {"role": "user", "content": prompt},
-                        ],
-                    model=self.api_model_name,
-                    max_tokens=max_new_tokens,
-                    seed=self.seed,
-                    temperature=temperature,
-                    )
-        else:
-            raise Exception("Images are only supported for OpenAI models")
+    async def _run_images(self, llm, batch_prompts):
+        batch_results = []
+        for prompt in batch_prompts:
+            message = HumanMessage(content=prompt)
+            batch_results.append(llm.ainvoke([message]))
+        return await asyncio.gather(*batch_results)
 
-        return await llm_output
-
-    async def _run_async_inference(self, client, prompt, max_new_tokens, temperature:float =1):
-        if self.is_openai:
-            llm_output = client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant"},
-                        {"role": "user", "content": prompt},
-                        ],
-                    model=self.api_model_name,
-                    max_tokens=max_new_tokens,
-                    seed=self.seed,
-                    temperature=temperature,
-                    )
+    def _get_model_id(self):
+        model_id = None
+        if self.model_type == "cohere-command-r":
+            model_id = COHERE_COMMAND_R_MODEL_ID
+        elif self.model_type == "cohere-command":
+            model_id = COHERE_COMMAND_MODEL_ID
+        elif self.model_type == "cohere-command-light":
+            model_id = COHERE_COMMAND_LIGHT_MODEL_ID
+        elif self.model_type == "claude-haiku-3":
+            model_id = CLAUDE_HAIKU_3_MODEL_ID
+        elif self.model_type == "claude-sonnet":
+            model_id = CLAUDE_SONNET_MODEL_ID
         else:
-            llm_output = client.chat_completion(
-                    [
-                        {"role": "system", "content": "You are a helpful assistant"},
-                        {"role": "user", "content": prompt},
-                        ],
-                    max_tokens=max_new_tokens,
-                    seed=self.seed
-                    )
-        return await llm_output
+            raise Exception("Invalid model type")
+        return model_id

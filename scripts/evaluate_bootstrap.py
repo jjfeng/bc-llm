@@ -18,6 +18,7 @@ sys.path.append(os.getcwd())
 from scripts.train_concept import make_dataset, setup
 from scripts.train_lasso import prep_lasso_data
 from src.common import load_model
+from src.llm.constants import *
 
 def parse_args(args):
     """parse command line arguments"""
@@ -36,7 +37,7 @@ def parse_args(args):
             "--llm-model-type",
             type=str,
             default="meta-llama/Meta-Llama-3-8B-Instruct",
-            choices=["meta-llama/Meta-Llama-3-8B-Instruct"]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     args = parser.parse_args()
     return args
