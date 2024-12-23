@@ -60,7 +60,6 @@ class LLMApi(LLM):
 
     def get_async_client(self):
         if self.model_type in OPENAI_MODELS:
-            # default max_retries = 2
             self.access_token = os.getenv("OPENAI_ACCESS_TOKEN")
             return AsyncOpenAI(api_key=self.access_token, timeout=self.timeout)
         elif self.model_type in VERSA_MODELS:

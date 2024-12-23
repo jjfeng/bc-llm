@@ -101,6 +101,7 @@ def main(args):
             prompt_template
         )
     else:
+        new_data_df = new_data_df.dropna(subset=['sentence'])
         group_ids, sentences = common.split_sentences_by_id(
             new_data_df,
             args.max_section_length

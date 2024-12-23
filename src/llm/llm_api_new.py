@@ -1,5 +1,6 @@
 from src.llm.llm import LLM
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage
 from langchain_aws.chat_models.bedrock_converse import ChatBedrockConverse
 from torch.utils.data import Dataset
 from dotenv import load_dotenv
@@ -11,6 +12,7 @@ import time
 
 from src.llm.llm import LLM
 from src.llm.constants import *
+from src.llm.chat_versa import ChatVersa
 from torch.utils.data import DataLoader
 
 """
@@ -44,7 +46,15 @@ class LLMApiNew(LLM):
                     timeout=self.timeout
                     )
         elif self.model_type in VERSA_MODELS:
-            raise Exception
+            api_key = os.environ.get('VERSA_API_KEY')
+            return ChatVersa(
+                    model_name=self.model_type,
+                    api_key=api_key,
+                    max_tokens=max_new_tokens,
+                    temperature=temperature,
+                    timeout=self.timeout,
+                    seed=self.seed
+                    )
         elif self.model_type in BEDROCK_MODELS:
             access_key = os.getenv("BEDROCK_ACCESS_KEY")
             secret_access_key = os.getenv("BEDROCK_ACCESS_TOKEN")
@@ -56,8 +66,6 @@ class LLMApiNew(LLM):
                     temperature=temperature,
                     model_id=self._get_model_id()
                     )
-
-
 
     # Note: if passing in an image here the prompt should contain the base64 encoded image.
     # see _encode_images for an example
@@ -99,7 +107,11 @@ class LLMApiNew(LLM):
             num_retries = 0
             while not got_result and (num_retries < max_retries):
                 try: 
-                    batch_results = await llm.abatch(batch_prompts)
+                    if is_image:
+                        batch_results = await self._run_images(llm, batch_prompts)
+                    else:
+                        batch_results = await llm.abatch(batch_prompts)
+
                     batch_results = [response.content for response in batch_results]
                     if validation_func is not None:
                         validation_func(batch_results)
@@ -123,6 +135,28 @@ class LLMApiNew(LLM):
         self.logging.info("NUM RESULTS %d", len(results))
         assert len(results) == len(dataset)
         return results
+
+    def _encode_images(self, batch_data: list[dict, str]) -> list[dict]:
+        updated_payloads = []
+        for (payload, image_path) in batch_data:
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+            payload.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}"
+                }
+            })
+            updated_payloads.append(payload)
+        return updated_payloads
+
+    async def _run_images(self, llm, batch_prompts):
+        batch_results = []
+        for prompt in batch_prompts:
+            message = HumanMessage(content=prompt)
+            batch_results.append(llm.ainvoke([message]))
+        return await asyncio.gather(*batch_results)
 
     def _get_model_id(self):
         model_id = None
