@@ -64,7 +64,7 @@ class LLMApi(LLM):
                     region_name=AWS_REGION,
                     max_tokens=max_new_tokens,
                     temperature=temperature,
-                    model_id=self._get_model_id()
+                    model_id=BEDROCK_MAPPINGS[self.model_type]
                     )
 
     # Note: if passing in an image here the prompt should contain the base64 encoded image.
@@ -73,7 +73,8 @@ class LLMApi(LLM):
         self.logging.info("LLM (%s) prompt %s", self.model_type, prompt)
         llm = self.get_client(max_new_tokens, temperature)
         if is_image:
-            raise Exception
+            message = HumanMessage(content=prompt)
+            response = llm.invoke([message])
         else:
             response = llm.invoke(prompt)
 
@@ -157,19 +158,3 @@ class LLMApi(LLM):
             message = HumanMessage(content=prompt)
             batch_results.append(llm.ainvoke([message]))
         return await asyncio.gather(*batch_results)
-
-    def _get_model_id(self):
-        model_id = None
-        if self.model_type == "cohere-command-r":
-            model_id = COHERE_COMMAND_R_MODEL_ID
-        elif self.model_type == "cohere-command":
-            model_id = COHERE_COMMAND_MODEL_ID
-        elif self.model_type == "cohere-command-light":
-            model_id = COHERE_COMMAND_LIGHT_MODEL_ID
-        elif self.model_type == "claude-haiku-3":
-            model_id = CLAUDE_HAIKU_3_MODEL_ID
-        elif self.model_type == "claude-sonnet":
-            model_id = CLAUDE_SONNET_MODEL_ID
-        else:
-            raise Exception("Invalid model type")
-        return model_id
