@@ -32,4 +32,4 @@ Example:
   ]
 }
 
-Ensure your answer contains {num_meta_concepts} concepts. Your answer:
+Ensure your answer contains {num_meta_concepts} concepts. Do not output any other text besides a string of valid JSON. Your answer:

@@ -6,6 +6,7 @@ BEDROCK_MAPPINGS = {
         "cohere-command": "cohere.command-text-v14",
         "cohere-command-light": "cohere.command-light-text-v14",
         "claude-haiku-3": "anthropic.claude-3-haiku-20240307-v1:0",
+        "claude-haiku-3-5": "anthropic.claude-3-5-haiku-20241022-v1:0",
         "claude-sonnet": "anthropic.claude-3-5-sonnet-20241022-v2:0"
         }
 

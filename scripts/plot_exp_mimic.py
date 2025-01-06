@@ -64,7 +64,7 @@ def main():
         'baseline': 'One-pass',
         'bayesian': 'BC-LLM',
         'boosting': 'Boosting',
-        'oracle': 'Pre-specified',
+        'oracle': 'Oracle',
         'Bag of Words': 'Bag-of-words',
     })
     res = res.rename({
@@ -88,7 +88,7 @@ def main():
             'BC-LLM',
             'One-pass',
             'Boosting',
-            'Pre-specified',
+            'Oracle',
             'Bag-of-words'
         ]
     )

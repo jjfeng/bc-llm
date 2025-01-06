@@ -20,7 +20,7 @@ from src.llm.llm import LLM
 TABULAR_PREFIX = "Tabular feature: "
 
 
-def query_and_parse_llm(llm, llm_prompt, extract_func, times_to_retry=4, default_response=None):
+def query_and_parse_llm(llm, llm_prompt, extract_func, times_to_retry=10, default_response=None):
     llm_response = llm.get_output(llm_prompt, max_new_tokens=2500)
     print(llm_response)
     while times_to_retry > 0:

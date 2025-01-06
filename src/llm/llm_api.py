@@ -34,7 +34,7 @@ class LLMApi(LLM):
         self.timeout = timeout
         self.is_api = True
 
-    def get_client(self, max_new_tokens=5000, temperature=0):
+    def get_client(self, max_new_tokens=4000, temperature=0):
         if self.model_type in OPENAI_MODELS:
             access_token = os.getenv("OPENAI_ACCESS_TOKEN")
             return ChatOpenAI(
@@ -69,7 +69,7 @@ class LLMApi(LLM):
 
     # Note: if passing in an image here the prompt should contain the base64 encoded image.
     # see _encode_images for an example
-    def get_output(self, prompt, max_new_tokens=5000, is_image=False) -> str:
+    def get_output(self, prompt, max_new_tokens=4000, temperature=1, is_image=False) -> str:
         self.logging.info("LLM (%s) prompt %s", self.model_type, prompt)
         llm = self.get_client(max_new_tokens, temperature)
         if is_image:
@@ -79,13 +79,13 @@ class LLMApi(LLM):
             response = llm.invoke(prompt)
 
         self.logging.info("LLM response %s", response)
-        return response
+        return response.content
 
     async def get_outputs(
             self, 
             dataset: Dataset, 
             batch_size:int = 10, 
-            max_new_tokens=5000,
+            max_new_tokens=4000,
             is_image = False,
             max_retries = 2,
             temperature:float = 1,
