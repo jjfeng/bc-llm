@@ -34,7 +34,7 @@ def parse_args(args):
     parser.add_argument("--max-obs", type=int, default=-1)
     parser.add_argument("--num-posterior-iters", type=int, default=1)
     parser.add_argument("--max-num-concepts-extract", type=int, default=10)
-    parser.add_argument("--prompt-concepts-file", type=str, default="exp_multi_concept/prompts/concept_questions.txt")
+    parser.add_argument("--prompt-concepts-file", type=str, default="exp_mimic/prompts/concept_questions.txt")
     parser.add_argument("--in-dataset-file", type=str, help="csv of data")
     parser.add_argument("--indices-csv", type=str, help="csv of train/test indices")
     parser.add_argument("--out-extractions", type=str)
@@ -42,6 +42,7 @@ def parse_args(args):
     parser.add_argument("--training-history-file", type=str, help="the learned model")
     parser.add_argument("--is-image", action="store_true", default=False)
     parser.add_argument("--max-section-length", type=int, default=None)
+    parser.add_argument("--requests-per-second", type=float, default=None)
     parser.add_argument(
             "--llm-model-type",
             type=str,
@@ -166,7 +167,8 @@ def main(args):
         max_new_tokens=1000, # TODO: do not hard code?
         is_image=args.is_image,
         max_num_concepts_extract=args.max_num_concepts_extract,
-        max_section_length=args.max_section_length
+        max_section_length=args.max_section_length,
+        requests_per_second=args.requests_per_second
     )
 
     fig, ax = plt.subplots()

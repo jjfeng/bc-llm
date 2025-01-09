@@ -39,6 +39,7 @@ def parse_args(args):
     parser.add_argument("--indices-file", type=str,
                         help="csv of training indices")
     parser.add_argument("--is-image", action="store_true", default=False)
+    parser.add_argument("--requests-per-second", type=float, default=None)
     parser.add_argument("--llm-outputs-file", type=str,
                         help="csv file with llm concepts")
     parser.add_argument("--log-file", type=str,
@@ -141,7 +142,8 @@ def main(args):
             is_image=args.is_image,
             validation_func=lambda x: [
                 convert_to_json(elem, logging) for elem in x],
-            callback=write_llm_outputs
+            callback=write_llm_outputs,
+            requests_per_second=args.requests_per_second
         ))
     else:
         llm = LLMLocal(args.seed, args.llm_model_type, logging)

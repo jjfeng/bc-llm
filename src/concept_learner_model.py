@@ -60,6 +60,7 @@ class ConceptLearnerModel:
             force_keep_columns: pd.Series = None,
             max_new_tokens: int = 5000,
             num_top: int = 40,
+            requests_per_second: float = None
             ):
         self.init_history = init_history
         self.llm_iter = llm_iter
@@ -86,6 +87,7 @@ class ConceptLearnerModel:
         self.force_keep_columns = force_keep_columns
         self.max_new_tokens = max_new_tokens
         self.num_top = num_top
+        self.requests_per_second= requests_per_second
     
     def fit(self,
             data_df,
@@ -108,7 +110,8 @@ class ConceptLearnerModel:
                 extraction_file=self.out_extractions_file,
                 batch_size=self.batch_size,
                 is_image=self.is_image,
-                max_section_length=self.max_section_length
+                max_section_length=self.max_section_length,
+                requests_per_second=self.requests_per_second
         )
 
         # do posterior inference
@@ -170,7 +173,8 @@ class ConceptLearnerModel:
                     extraction_file=self.out_extractions_file,
                     batch_size=self.batch_size,
                     is_image=self.is_image,
-                    max_section_length=self.max_section_length
+                    max_section_length=self.max_section_length,
+                    requests_per_second=self.requests_per_second
                 )
 
                 if self.do_greedy or (i < self.num_greedy_epochs):

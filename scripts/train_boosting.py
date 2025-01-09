@@ -56,6 +56,7 @@ def parse_args(args):
     parser.add_argument("--is-image", action="store_true", default=False)
     parser.add_argument("--num-iters", type=int, default=30)
     parser.add_argument("--threshold", type=float, default=.0)
+    parser.add_argument("--requests-per-second", type=float, default=None)
     parser.add_argument(
         "--llm-model-type",
         type=str,
@@ -198,10 +199,12 @@ def extract_features_and_train(llm, data_df, concept_dicts, all_extracted_featur
         extraction_file=args.out_extractions,
         is_image=args.is_image,
         max_section_length=args.max_section_length,
+        requests_per_second=args.requests_per_second
     )
 
     X_train = common.get_features(
         concept_dicts, all_extracted_features, data_df, force_keep_columns=args.keep_x_cols)
+
     model_results = common.train_LR(X_train, y_train, penalty=None)
 
     return all_extracted_features, model_results

@@ -58,10 +58,11 @@ def parse_args(args):
     parser.add_argument("--training-history-file", type=str, default=None)
     parser.add_argument("--init-history-file", type=str)
     parser.add_argument("--is-image", action="store_true", default=False)
-    parser.add_argument("--max-new-tokens", type=int, default=5000)
+    parser.add_argument("--max-new-tokens", type=int, default=4000)
     parser.add_argument("--num-top-residual-words", type=int, default=40)
     parser.add_argument("--do-greedy", action="store_true", default=False)
     parser.add_argument("--max-section-length", type=int, default=None)
+    parser.add_argument("--requests-per-second", type=float, default=None)
     parser.add_argument(
             "--llm-model-type",
             type=str,
@@ -95,7 +96,6 @@ def load_data_partition(args, init_concepts_file=None, text_summary_column: str 
 
     if init_concepts_file is not None:
         dset_init_concepts = pd.read_csv(init_concepts_file)
-        assert np.all(dset_init_concepts.sentence == dset.sentence)
         
         dset['llm_output'] = dset_init_concepts["llm_output"]
 
@@ -222,6 +222,7 @@ def main(args):
         force_keep_columns=args.keep_x_cols,
         num_top=args.num_top_residual_words,
         max_new_tokens=args.max_new_tokens,
+        requests_per_second=args.requests_per_second
     )
     bayesian_cbm.fit(
         data_df,

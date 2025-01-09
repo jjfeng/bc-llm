@@ -14,6 +14,8 @@ from src.llm.llm import LLM
 from src.llm.constants import *
 from src.llm.chat_versa import ChatVersa
 from torch.utils.data import DataLoader
+from langchain_core.rate_limiters import InMemoryRateLimiter
+
 
 """
 Please set your HF, OpenAI, and Versa tokens in a .env file. Note: The API currently only supports image inference for
@@ -34,7 +36,16 @@ class LLMApi(LLM):
         self.timeout = timeout
         self.is_api = True
 
-    def get_client(self, max_new_tokens=4000, temperature=0):
+    def get_client(self, max_new_tokens=4000, temperature=0, requests_per_second=None):
+        if requests_per_second:
+            rate_limiter = InMemoryRateLimiter(
+                    requests_per_second=requests_per_second,
+                    check_every_n_seconds=0.1,
+                    max_bucket_size=10
+                    )
+        else:
+            rate_limiter = None
+
         if self.model_type in OPENAI_MODELS:
             access_token = os.getenv("OPENAI_ACCESS_TOKEN")
             return ChatOpenAI(
@@ -43,7 +54,9 @@ class LLMApi(LLM):
                     max_tokens=max_new_tokens,
                     temperature=temperature,
                     seed=self.seed,
-                    timeout=self.timeout
+                    timeout=self.timeout,
+                    rate_limiter=rate_limiter
+
                     )
         elif self.model_type in VERSA_MODELS:
             api_key = os.environ.get('VERSA_API_KEY')
@@ -53,7 +66,8 @@ class LLMApi(LLM):
                     max_tokens=max_new_tokens,
                     temperature=temperature,
                     timeout=self.timeout,
-                    seed=self.seed
+                    seed=self.seed,
+                    rate_limiter=rate_limiter
                     )
         elif self.model_type in BEDROCK_MODELS:
             access_key = os.getenv("BEDROCK_ACCESS_KEY")
@@ -64,7 +78,8 @@ class LLMApi(LLM):
                     region_name=AWS_REGION,
                     max_tokens=max_new_tokens,
                     temperature=temperature,
-                    model_id=BEDROCK_MAPPINGS[self.model_type]
+                    model_id=BEDROCK_MAPPINGS[self.model_type],
+                    rate_limiter=rate_limiter
                     )
 
     # Note: if passing in an image here the prompt should contain the base64 encoded image.
@@ -90,9 +105,10 @@ class LLMApi(LLM):
             max_retries = 2,
             temperature:float = 1,
             callback = None,
-            validation_func = None
+            validation_func = None,
+            requests_per_second = None
             ):
-        llm = self.get_client(max_new_tokens, temperature)
+        llm = self.get_client(max_new_tokens, temperature, requests_per_second)
         if is_image:
             # the collate_fn is used here because passing in the full payload with the base encoded image causing
             # dataloader to break. The image is encoded into base64 after the batch is created
@@ -156,5 +172,8 @@ class LLMApi(LLM):
         batch_results = []
         for prompt in batch_prompts:
             message = HumanMessage(content=prompt)
+            from datetime import datetime
+            print("---")
+            print(datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
             batch_results.append(llm.ainvoke([message]))
         return await asyncio.gather(*batch_results)
