@@ -53,6 +53,7 @@ def parse_args(args):
         default="meta-llama/Meta-Llama-3.1-8B-Instruct",
         choices=[
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "gpt-4o-mini",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct",
                 "meta-llama/Meta-Llama-3.1-70B-Instruct",
@@ -117,7 +118,7 @@ def main(args):
             prompt_template,
             text_to_replace="{note}",
         )
-
+    
     def write_llm_outputs(llm_outputs):
         tot_num_llm_outs = len(llm_outputs)
         grp_llm_output_list = []

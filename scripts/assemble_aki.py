@@ -47,7 +47,7 @@ def main(args):
     notes_df = pd.read_csv(args.note_dataset_file).reset_index(drop=True)
     print(notes_df)
 
-    merged_df = tabular_df.merge(notes_df, on=["deid_case_id","deid_mrn"])
+    merged_df = tabular_df.merge(notes_df[~notes_df.preop_note_text.isna()], on=["deid_case_id","deid_mrn"]).rename({"preop_note_text": "sentence"}, axis=1)
 
     merged_df.to_csv(args.out_csv, index=False)
 

@@ -15,11 +15,12 @@ nest = SConsWrap(Nest(), localenv['output'], alias_environment=localenv)
 AKI_DATA_TABULAR = "exp_aki/data/preop_data_commit_7d16b8f.csv"
 AKI_DATA_NOTES = 'exp_aki/data/preop_data_suppl_note_commit_7d16b8f.csv'
 
-NUM_EPOCHS = 5 # bayesian epochs
+NUM_EPOCHS = 0 # bayesian epochs
 NUM_GREEDY_EPOCHS = 1
 NUM_BOOST_ITERS = 10
 NUM_NEW_TOKENS = 600
 MAX_SECTION_TOKENS = 2500
+MAX_OBS_LIST = [200]
 
 EXTRACT_LLM_PROMPT_DICT = {
     'basic': 'exp_aki/prompts/basic.txt'
@@ -27,13 +28,13 @@ EXTRACT_LLM_PROMPT_DICT = {
 
 # DO NOT use GPT
 LLM_MODELS = [
-    "versa-gpt-4o-2024-05-13",
+    "versa-gpt-4o-mini-2024-07-18",
 ]
 LLM_DICT = {
-    "versa-gpt-4o-2024-05-13": {
+    "versa-gpt-4o-mini-2024-07-18": {
         "api": True, # using API
         "batch_size": 20,
-        "max_extract_length": 2000,
+        "max_extract_length": 5000,
         "max_binary_extract_length": 4000,
         "max_new_tokens": 4000,
         "num_top_resid_words": 40,
@@ -58,9 +59,8 @@ INIT_CONCEPT_DICT = {
     'spacy_output': 0.01
 }
 
-nest.add('num_obs', [
-        700
-    ],
+nest.add('num_obs',
+    [max(MAX_OBS_LIST)],
     label_func=lambda c: "max_obs_%d" % c
 )
 
@@ -91,90 +91,89 @@ def make_notes_data(env, outdir, c):
         ' '.join(map(str, cmd))
     )
 
-# nest.add('replicate_seed', [
-#         1,
-#     ],
-#     label_func=lambda c: "replicate_seed_%d" % c
-# )
+nest.add('replicate_seed', [
+        1,
+    ],
+    label_func=lambda c: "replicate_seed_%d" % c
+)
 
-# nest.add('max_obs', [
-#        1500
-#     ],
-#     label_func=lambda c: "max_obs_%d" % c
-# )
-# nest.add(
-#     'test_frac',
-#     [.33335],
-#     label_func=lambda c: "test_%.2f" % c)
+nest.add('max_obs',
+    MAX_OBS_LIST,
+    label_func=lambda c: "max_obs_%d" % c
+)
+nest.add(
+    'test_frac',
+    [.5],
+    label_func=lambda c: "test_%.2f" % c)
 
-# @nest.add_target_with_env(localenv)
-# def train_test_split(env, outdir, c):
-#     cmd = [
-#         'python scripts/train_test_split.py',
-#         '--seed', c['replicate_seed'] + 1,
-#         '--max-obs', c['max_obs'],
-#         '--data-csv ${SOURCES[0]}', 
-#         '--test-frac',
-#         c['test_frac'],
-#         '--indices-csv ${TARGETS[0]}',
-#     ]
+@nest.add_target_with_env(localenv)
+def train_test_split(env, outdir, c):
+    cmd = [
+        'python scripts/train_test_split.py',
+        '--seed', c['replicate_seed'] + 1,
+        '--max-obs', c['max_obs'],
+        '--data-csv ${SOURCES[0]}', 
+        '--test-frac',
+        c['test_frac'],
+        '--indices-csv ${TARGETS[0]}',
+    ]
 
-#     sources = c['make_notes_data']
-#     targets = [
-#         path_join(outdir, 'train_test_indices.csv'),
-#     ]
+    sources = c['make_notes_data']
+    targets = [
+        path_join(outdir, 'train_test_indices.csv'),
+    ]
 
-#     return env.Command(
-#         targets,
-#         sources,
-#         ' '.join(map(str, cmd))
-#     )
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
 
-# nest.add('llm_model', LLM_MODELS)
-# nest.add_aggregate('llm_concept_extract', str)
+nest.add('llm_model', LLM_MODELS)
+nest.add_aggregate('llm_concept_extract', str)
 
-# nest.add(
-#     'extraction_prompt',
-#     [
-#         'new'
-#     ])
+nest.add(
+    'extraction_prompt',
+    [
+        'basic'
+    ])
 
-# @nest.add_target_with_env(localenv)
-# def extract_llm_output(env, outdir, c):
-#     targets = [
-#         path_join(outdir, 'log_extract_hierarchy.txt'),
-#         path_join(outdir, 'concept_extractions.csv'),
-#     ]
-#     c['llm_concept_extract'] = targets[1]
-#     if os.path.exists(targets[1]):
-#         return
+@nest.add_target_with_env(localenv)
+def extract_llm_output(env, outdir, c):
+    targets = [
+        path_join(outdir, 'log_extract_hierarchy.txt'),
+        path_join(outdir, 'concept_extractions.csv'),
+    ]
+    c['llm_concept_extract'] = targets[1]
+    if os.path.exists(targets[1]):
+        return
 
-#     cmd = [
-#         'python scripts/extract_llm_concepts.py',
-#          f'--seed',
-#          0,
-#          '--batch-size', LLM_DICT[c['llm_model']]['batch_size'],
-#          '--num-new-tokens', LLM_DICT[c['llm_model']]['max_new_tokens'],
-#          '--in-dataset-file ${SOURCES[0]}',
-#          '--indices-file ${SOURCES[1]}',
-#          '--prompt-file', EXTRACT_LLM_PROMPT_DICT[c['extraction_prompt']],
-#          '--log-file ${TARGETS[0]}',
-#          '--llm-output ${TARGETS[1]}',
-#          '--llm-model-type',
-#          c['llm_model'],
-#          '--use-api' if LLM_DICT[c['llm_model']]['api'] else '',
-#          '--max-section-length ', LLM_DICT[c['llm_model']]['max_extract_length'],
-#     ]
+    cmd = [
+        'python scripts/extract_llm_concepts.py',
+         f'--seed',
+         0,
+         '--batch-size', LLM_DICT[c['llm_model']]['batch_size'],
+         '--num-new-tokens', LLM_DICT[c['llm_model']]['max_new_tokens'],
+         '--in-dataset-file ${SOURCES[0]}',
+         '--indices-file ${SOURCES[1]}',
+         '--prompt-file', EXTRACT_LLM_PROMPT_DICT[c['extraction_prompt']],
+         '--log-file ${TARGETS[0]}',
+         '--llm-output ${TARGETS[1]}',
+         '--llm-model-type',
+         c['llm_model'],
+         '--use-api' if LLM_DICT[c['llm_model']]['api'] else '',
+         '--max-section-length ', LLM_DICT[c['llm_model']]['max_extract_length'],
+    ]
 
-#     sources = [
-#         c['make_notes_data'][0],
-#         c['train_test_split'][0],
-#     ]
-#     return env.Command(
-#         targets,
-#         sources,
-#         ' '.join(map(str, cmd))
-#     )
+    sources = [
+        c['make_notes_data'][0],
+        c['train_test_split'][0],
+    ]
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
 
 # nest.add(
 #     'init_concept_extraction',

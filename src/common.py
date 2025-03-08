@@ -103,6 +103,7 @@ def split_sentences_by_id(
     """
     If texts are too long, split it into sections and return group_id as well as the sections
     """
+    print("max_section_length", max_section_length)
     if max_section_length is None:
         return np.arange(dset_train.shape[0]), dset_train.sentence.to_numpy()
     else:
@@ -110,6 +111,8 @@ def split_sentences_by_id(
         ids = []
         for idx, row in dset_train.iterrows():
             sentence = row.sentence
+            print("sentence", sentence)
+            print("len sentence", len(sentence))
             if len(sentence) > max_section_length:
                 for start in range(0, len(sentence), max_section_length):
                     end = min(start + max_section_length, len(sentence))
