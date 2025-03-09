@@ -68,6 +68,7 @@ def parse_args(args):
             choices=[
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
                 "meta-llama/Meta-Llama-3.1-70B-Instruct", 
                 "meta-llama/Llama-3.2-11B-Vision-Instruct" 
@@ -80,6 +81,7 @@ def parse_args(args):
             choices=[
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
                 "meta-llama/Meta-Llama-3.1-70B-Instruct", 
                 "meta-llama/Llama-3.2-11B-Vision-Instruct" 
@@ -92,6 +94,7 @@ def parse_args(args):
             choices=[
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
                 "meta-llama/Meta-Llama-3.1-70B-Instruct", 
                 "meta-llama/Llama-3.2-11B-Vision-Instruct" 
@@ -123,7 +126,7 @@ def load_data_partition(args, init_concepts_file=None, text_summary_column: str 
     
     if args.max_obs > 0:
         dset_partition = dset_partition.iloc[:args.max_obs]
-    logging.info("DSET PARTITION size %s", dset_partition.shape)
+    logging.info("DSET PARTITION size %s prevalence: %f", dset_partition.shape, dset_partition.y.mean())
 
     print(dset_partition)
     print("FINAL NON-NA DSET", dset_partition.shape)

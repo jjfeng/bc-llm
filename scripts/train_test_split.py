@@ -51,11 +51,15 @@ def main(args):
         print("case_idxs", case_idxs.size, case_idxs[:10])
         control_idxs = np.random.choice(np.where(data_df.y == 0)[0], num_controls, replace=False)
         print("control_idxs", control_idxs.size, control_idxs[:10])
-        rand_idxs = np.random.shuffle(np.concatenate([case_idxs, control_idxs]))
+        rand_idxs = np.concatenate([case_idxs, control_idxs])
+        np.random.shuffle(rand_idxs)
         df = pd.DataFrame({
             "idx": rand_idxs,
             "partition": _split(num_obs, args.test_frac)
         }).sort_values('partition', ascending=True)
+        print(df)
+        print(df.idx[df.partition == "test"])
+        print("pREVALENCE", data_df.y[df.idx[df.partition == "test"]].mean())
     else:
         df = pd.DataFrame({
             "idx": np.random.choice(data_df.index, num_obs, replace=False),

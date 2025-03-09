@@ -43,19 +43,20 @@ def main(args):
     np.random.seed(args.seed)
 
     tabular_df = pd.read_csv(args.tabular_dataset_file).reset_index(drop=True)
-    print(tabular_df)
     notes_df = pd.read_csv(args.note_dataset_file).reset_index(drop=True)
-    print(notes_df)
 
     merged_df = tabular_df.merge(notes_df[~notes_df.preop_note_text.isna()], on=["deid_case_id","deid_mrn"]).rename(
         {
             "preop_note_text": "sentence",
             "aki_outcome": "y",
         }, axis=1)
+    logging.info("prevalence ORIG %f", merged_df.y.mean())
     if args.max_obs is not None:
-        merged_df = merged_df.iloc[np.random.choice(merged_df.index, args.max_obs, replace=False)]
+        control_idxs = np.where(merged_df.y == 1)[0]
+        case_idxs = np.random.choice(np.where(merged_df.y == 0)[0], args.max_obs, replace=False)
+        merged_df = merged_df.iloc[np.concatenate([control_idxs, case_idxs])]
 
-    logging.info("prevalence %f", merged_df.y.mean())
+    logging.info("prevalence in filtered %f", merged_df.y.mean())
 
     merged_df.to_csv(args.out_csv, index=False)
 
