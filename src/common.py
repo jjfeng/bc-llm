@@ -114,6 +114,7 @@ def split_sentences_by_id(
             print("sentence", sentence)
             print("len sentence", len(sentence))
             if len(sentence) > max_section_length:
+                print("num sections of note", len(sentence)//max_section_length)
                 for start in range(0, len(sentence), max_section_length):
                     end = min(start + max_section_length, len(sentence))
                     ids.append(idx)

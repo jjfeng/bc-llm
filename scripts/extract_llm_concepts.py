@@ -120,6 +120,7 @@ def main(args):
         )
     
     def write_llm_outputs(llm_outputs):
+        logging.info("saving intermediary LLM outputs")
         tot_num_llm_outs = len(llm_outputs)
         grp_llm_output_list = []
         for grp_id in np.unique(group_ids[:tot_num_llm_outs]):

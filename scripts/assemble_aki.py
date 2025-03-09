@@ -20,7 +20,6 @@ def parse_args(args):
     """parse command line arguments"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=0, help="random seed")
-    parser.add_argument("--num-train", type=int, default=100, help="max number of observations")
     parser.add_argument("--note-dataset-file",
                         type=str,
                         help="location of your notes data"

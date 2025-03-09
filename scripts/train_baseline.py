@@ -46,6 +46,7 @@ def parse_args(args):
             choices=[
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
                 "meta-llama/Meta-Llama-3.1-70B-Instruct", 
                 "meta-llama/Llama-3.2-11B-Vision-Instruct" 
@@ -58,6 +59,7 @@ def parse_args(args):
             choices=[
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
                 "meta-llama/Meta-Llama-3.1-70B-Instruct", 
                 "meta-llama/Llama-3.2-11B-Vision-Instruct" 
@@ -70,6 +72,7 @@ def parse_args(args):
             choices=[
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
                 "meta-llama/Llama-3.2-11B-Vision-Instruct",
                 "meta-llama/Meta-Llama-3.1-70B-Instruct"
