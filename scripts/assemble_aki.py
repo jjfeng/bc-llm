@@ -51,10 +51,11 @@ def main(args):
             "aki_outcome": "y",
         }, axis=1)
     logging.info("prevalence ORIG %f", merged_df.y.mean())
-    if args.max_obs is not None:
-        control_idxs = np.where(merged_df.y == 1)[0]
-        case_idxs = np.random.choice(np.where(merged_df.y == 0)[0], args.max_obs, replace=False)
-        merged_df = merged_df.iloc[np.concatenate([control_idxs, case_idxs])]
+    case_idxs = np.where(merged_df.y == 1)[0]
+    num_control = case_idxs.size
+    control_idxs = np.random.choice(np.where(merged_df.y == 0)[0], num_control, replace=False)
+    print("case", case_idxs.size, "control", control_idxs.size)
+    merged_df = merged_df.iloc[np.concatenate([control_idxs, case_idxs])]
 
     logging.info("prevalence in filtered %f", merged_df.y.mean())
 

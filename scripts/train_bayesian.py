@@ -126,7 +126,6 @@ def load_data_partition(args, init_concepts_file=None, text_summary_column: str 
     
     if args.max_obs > 0:
         dset_partition = dset_partition.iloc[:args.max_obs]
-    logging.info("DSET PARTITION size %s prevalence: %f", dset_partition.shape, dset_partition.y.mean())
 
     print(dset_partition)
     print("FINAL NON-NA DSET", dset_partition.shape)
@@ -202,6 +201,8 @@ def main(args):
     history = TrainingHistory(args.keep_x_cols).load(args.init_history_file)
     
     data_df = load_data_partition(args, init_concepts_file=args.init_concepts_file, text_summary_column=args.text_summary_column)
+    data_df = data_df[~data_df[text_summary_column].isna()]
+    logging.info("DSET PARTITION size %s prevalence: %f", data_df.shape, data_df.y.mean())
 
     X_features, feat_names = get_word_count_data(data_df, args.count_vectorizer, args.text_summary_column, min_prevalence=args.min_prevalence)
     print("data_df for prior generation", data_df.shape)

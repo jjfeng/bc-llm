@@ -20,7 +20,7 @@ NUM_GREEDY_EPOCHS = 1
 NUM_BOOST_ITERS = 10
 NUM_NEW_TOKENS = 600
 MAX_SECTION_TOKENS = 2500
-MAX_OBS_LIST = [2000]
+MAX_OBS_LIST = [4000]
 
 EXTRACT_LLM_PROMPT_DICT = {
     'basic': 'exp_aki/prompts/basic.txt'
@@ -59,11 +59,6 @@ INIT_CONCEPT_DICT = {
     'llm_output': 0.01,
 }
 
-nest.add('num_obs',
-    [max(MAX_OBS_LIST) * 40],
-    label_func=lambda c: "max_obs_%d" % c
-)
-
 nest.add('seed', [
         0
     ],
@@ -75,7 +70,6 @@ def make_notes_data(env, outdir, c):
     cmd = [
         'python scripts/assemble_aki.py',
         '--seed', c['seed'],
-        '--max-obs', c['num_obs'],
         '--tabular-dataset-file', AKI_DATA_TABULAR,
         '--note-dataset-file', AKI_DATA_NOTES,
         '--out-csv ${TARGETS[0]}',
@@ -194,7 +188,7 @@ nest.add(
 nest.add_aggregate('train_baseline_history', str)
 nest.add(
     'num_meta_concepts',
-    [4],
+    [5],
     label_func=lambda c: "num_concepts_%s" % c)
 
 
@@ -331,7 +325,7 @@ def evaluate_bayesian(env, outdir, c):
         c['replicate_seed'] + 5,
         '--method-name', 'bayesian',
         '--num-posterior-iters',
-        NUM_EPOCHS * c['num_meta_concepts'],
+        NUM_EPOCHS//2 * c['num_meta_concepts'],
         '--batch-size',
         LLM_DICT[c['llm_model']]['batch_size'],
         '--in-dataset-file ${SOURCES[0]}',
@@ -368,30 +362,30 @@ def evaluate_bayesian(env, outdir, c):
     )
 
 
-# @nest.add_target_with_env(localenv)
-# def plot_bayesian_agg(env, outdir, c):
-#     cmd = [
-#         'python scripts/plot_exp_clinical_notes.py',
-#         f'--seed',
-#         c['seed'] + 15,
-#         '--num-posterior-iters',
-#         (NUM_EPOCHS - 1) * 6,
-#         '--history-file ${SOURCES[0]}',
-#         '--extraction-file ${SOURCES[1]}',
-#         '--plot ${TARGETS[0]}',
-#         '--concepts-csv ${TARGETS[1]}',
-#     ]
-#     sources = [
-#         c['train_bayesian_history'],
-#         c['test_extractions'],
-#     ]
-#     targets = [
-#         path_join(outdir, 'bayesian_hier.png'),
-#         path_join(outdir, 'concepts.csv'),
-#     ]
+@nest.add_target_with_env(localenv)
+def plot_bayesian_agg(env, outdir, c):
+    cmd = [
+        'python scripts/plot_exp_clinical_notes.py',
+        f'--seed',
+        c['seed'] + 15,
+        '--num-posterior-iters',
+        NUM_EPOCHS//2 * c['num_meta_concepts'],
+        '--history-file ${SOURCES[0]}',
+        '--extraction-file ${SOURCES[1]}',
+        '--plot ${TARGETS[0]}',
+        '--concepts-csv ${TARGETS[1]}',
+    ]
+    sources = [
+        c['train_bayesian_history'],
+        c['test_extractions'],
+    ]
+    targets = [
+        path_join(outdir, 'bayesian_hier.png'),
+        path_join(outdir, 'concepts.csv'),
+    ]
 
-#     return env.Command(
-#         targets,
-#         sources,
-#         ' '.join(map(str, cmd))
-#     )
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
