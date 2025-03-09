@@ -20,7 +20,7 @@ OpenAI models
 """
 
 OPENAI_MODELS = ["gpt-4o-mini", "gpt-4o"]
-VERSA_MODELS = ["versa-gpt-4o-2024-05-13"]
+VERSA_MODELS = ["versa-gpt-4o-2024-05-13", "versa-gpt-4o-mini-2024-07-18"]
 
 class LLMApi(LLM):
     def __init__(self,
@@ -44,7 +44,9 @@ class LLMApi(LLM):
         elif self.model_type in VERSA_MODELS:
             self.api_key = os.environ.get('VERSA_API_KEY')
             self.api_version = os.environ.get('VERSA_API_VERSION')
-            self.resource_endpoint = os.environ.get('VERSA_RESOURCE_ENDPOINT')
+            self.resource_endpoint = os.environ.get('VERSA_RESOURCE_ENDPOINT').replace(
+                "<model_name>", self.api_model_name
+            )
             return AzureOpenAI(
                 api_key=self.api_key,
                 api_version=self.api_version,
@@ -66,7 +68,9 @@ class LLMApi(LLM):
         elif self.model_type in VERSA_MODELS:
             self.api_key = os.environ.get('VERSA_API_KEY')
             self.api_version = os.environ.get('VERSA_API_VERSION')
-            self.resource_endpoint = os.environ.get('VERSA_RESOURCE_ENDPOINT')
+            self.resource_endpoint = os.environ.get('VERSA_RESOURCE_ENDPOINT').replace(
+                "<model_name>", self.api_model_name
+            )
             return AsyncAzureOpenAI(
                 api_key=self.api_key,
                 api_version=self.api_version,

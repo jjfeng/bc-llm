@@ -46,6 +46,7 @@ def parse_args(args):
             choices=[
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
                 "meta-llama/Meta-Llama-3.1-70B-Instruct", 
                 "meta-llama/Llama-3.2-11B-Vision-Instruct" 
@@ -58,6 +59,7 @@ def parse_args(args):
             choices=[
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
                 "meta-llama/Meta-Llama-3.1-70B-Instruct", 
                 "meta-llama/Llama-3.2-11B-Vision-Instruct" 
@@ -70,6 +72,7 @@ def parse_args(args):
             choices=[
                 "gpt-4o-mini",
                 "versa-gpt-4o-2024-05-13",
+                "versa-gpt-4o-mini-2024-07-18",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct", 
                 "meta-llama/Llama-3.2-11B-Vision-Instruct",
                 "meta-llama/Meta-Llama-3.1-70B-Instruct"
@@ -115,6 +118,8 @@ def main(args):
     history = TrainingHistory(args.keep_x_cols)
 
     data_df = load_data_partition(args, init_concepts_file=args.init_concepts_file, text_summary_column=args.text_summary_column)
+    data_df = data_df[~data_df[text_summary_column].isna()]
+    logging.info("DSET PARTITION size %s prevalence: %f", data_df.shape, data_df.y.mean())
 
     X_words_train, word_names = get_word_count_data(data_df, args.count_vectorizer, args.text_summary_column, min_prevalence=args.min_prevalence)
     y_train = data_df['y'].to_numpy().flatten()

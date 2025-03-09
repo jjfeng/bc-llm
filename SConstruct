@@ -20,11 +20,14 @@ sc.Export('env')
 
 env.SConsignFile()
 
-flag = 'exp_cub_birds_existing'
+flag = 'exp_aki'
 sc.SConscript(flag + '/sconscript', exports=['flag'])
 
-flag = 'exp_mimic'
-sc.SConscript(flag + '/sconscript', exports=['flag'])
+# flag = 'exp_cub_birds_existing'
+# sc.SConscript(flag + '/sconscript', exports=['flag'])
 
-flag = 'exp_clinical_notes'
-sc.SConscript(flag + '/sconscript', exports=['flag'])
+# flag = 'exp_mimic'
+# sc.SConscript(flag + '/sconscript', exports=['flag'])
+
+# flag = 'exp_clinical_notes'
+# sc.SConscript(flag + '/sconscript', exports=['flag'])
