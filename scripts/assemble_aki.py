@@ -28,6 +28,7 @@ def parse_args(args):
                         type=str,
                         help="location of your labelled data"
                         )
+    parser.add_argument("--max-obs", type=int, default=None)
     parser.add_argument("--out-csv", type=str,
                         help="the name of the output csv")
     parser.add_argument("--log-file", type=str, default="_output/log_aki.txt",
@@ -46,7 +47,15 @@ def main(args):
     notes_df = pd.read_csv(args.note_dataset_file).reset_index(drop=True)
     print(notes_df)
 
-    merged_df = tabular_df.merge(notes_df[~notes_df.preop_note_text.isna()], on=["deid_case_id","deid_mrn"]).rename({"preop_note_text": "sentence"}, axis=1)
+    merged_df = tabular_df.merge(notes_df[~notes_df.preop_note_text.isna()], on=["deid_case_id","deid_mrn"]).rename(
+        {
+            "preop_note_text": "sentence",
+            "aki_outcome": "y",
+        }, axis=1)
+    if args.max_obs is not None:
+        merged_df = merged_df.iloc[np.random.choice(merged_df.index, args.max_obs, replace=False)]
+
+    logging.info("prevalence %f", merged_df.y.mean())
 
     merged_df.to_csv(args.out_csv, index=False)
 
