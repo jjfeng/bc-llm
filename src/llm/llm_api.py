@@ -1,4 +1,3 @@
-from src.llm.llm import LLM
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from langchain_aws.chat_models.bedrock_converse import ChatBedrockConverse

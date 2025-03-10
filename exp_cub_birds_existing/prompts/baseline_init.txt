@@ -31,4 +31,4 @@ Example:
   ],
 }
 
-Do not suggest more than 10 concepts and do not answer with anything else besides JSON. Please validate your JSON before returning it.
+Ensure your answer contains {num_meta_concepts} concepts. Do not answer with anything else besides JSON. Please validate your JSON before returning it.

@@ -32,7 +32,6 @@ def parse_args(args):
     parser.add_argument("--log-file", type=str, default="_output/log_plot.txt")
     parser.add_argument("--plot-file", type=str, default="_output/test_scatter.png")
     parser.add_argument("--bootstrap-params", type=str, help="file that stores the values for the bootstrapped parameters for the concept model")
-    # currently the code works with llama models
     parser.add_argument(
             "--llm-model-type",
             type=str,

@@ -104,9 +104,9 @@ def main():
         all_concepts_df.append(concepts_df)
         all_concept_sizes.append((100 * posterior_probs)**2)
     
-    _, axes = plt.subplots(nrows=1, ncols=1, figsize=(10,5))
+    _, axes = plt.subplots(nrows=1, ncols=2, figsize=(10,5))
     for plot_idx, idx in enumerate([0,3]):
-        concepts_df = all_concepts_df[0].T
+        concepts_df = all_concepts_df[idx].T
         print(concepts_df)
         all_embeddings = np.array([all_extracted_features[c][:,0] for c in concepts_df.index])
         Z = scipy.cluster.hierarchy.linkage(all_embeddings, 'single', metric=dist_func)
@@ -114,7 +114,7 @@ def main():
             Z,
             labels=[make_clean_str(txt + f" ({weight:.2f})") for txt, weight in zip(concepts_df.index, concepts_df[0])],
             leaf_rotation=0,
-            ax=axes,
+            ax=axes[plot_idx] if len(all_concepts_df) > 1 else axes,
             color_threshold=0,
             orientation='right')
     plt.tight_layout()
