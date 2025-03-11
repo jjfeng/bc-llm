@@ -87,8 +87,11 @@ class LLMApi(LLM):
         self.logging.info("LLM (%s) prompt %s", self.model_type, prompt)
         llm = self.get_client(max_new_tokens, temperature)
         if is_image:
-            message = HumanMessage(content=prompt)
-            response = llm.invoke([message])
+             messages = [
+                     SystemMessage(content="You are a helpful assistant"),
+                     HumanMessage(content=prompt)
+                     ]
+            response = llm.invoke([messages])
         else:
             response = llm.invoke(prompt)
 
@@ -170,9 +173,11 @@ class LLMApi(LLM):
     async def _run_images(self, llm, batch_prompts):
         batch_results = []
         for prompt in batch_prompts:
-            message = HumanMessage(content=prompt)
+            messages = [SystemMessage(content="You are a helpful assistant"),
+                        HumanMessage(content=prompt)
+                        ]
             from datetime import datetime
             print("---")
             print(datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
-            batch_results.append(llm.ainvoke([message]))
+            batch_results.append(llm.ainvoke([messages]))
         return await asyncio.gather(*batch_results)
