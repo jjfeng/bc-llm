@@ -12,6 +12,7 @@ import pickle
 sys.path.append(os.getcwd())
 from scripts.train_bayesian import load_data_partition, get_word_count_data, load_llms
 from src.concept_learner_model import ConceptLearnerModel
+from src.llm.constants import *
 import src.common as common
 from src.training_history import TrainingHistory
 
@@ -31,8 +32,9 @@ def parse_args(args):
     parser.add_argument("--text-summary-column", type=str, default="llm_output", choices=['llm_output', 'sentence', 'spacy_output'])
     parser.add_argument("--max-section-length", type=int, default=None)
     parser.add_argument("--learner-type", type=str, default="count_l2", choices=['count_elasticnet','tfidf_l2', 'tfidf_l1', 'count_l2', 'count_l1'], help="model types")
-    parser.add_argument("--baseline-init-file", type=str, default="exp_multi_concept/prompts/baseline_init.txt")
-    parser.add_argument("--prompt-concepts-file", type=str, default="exp_multi_concept/prompts/concept_questions.txt")
+    parser.add_argument("--baseline-init-file", type=str, default="exp_mimic/prompts/baseline_init.txt")
+    parser.add_argument("--prompt-concepts-file", type=str, default="exp_mimic/prompts/concept_questions.txt")
+    parser.add_argument("--requests-per-second", type=float, default=None)
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--in-training-history-file", type=str, default=None)
     parser.add_argument("--out-training-history-file", type=str, default=None)
@@ -43,37 +45,19 @@ def parse_args(args):
             "--llm-model-type",
             type=str,
             default=None,
-            choices=[
-                "gpt-4o-mini",
-                "versa-gpt-4o-2024-05-13",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-                "meta-llama/Llama-3.2-11B-Vision-Instruct" 
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     parser.add_argument(
             "--llm-iter-type",
             type=str,
             default=None,
-            choices=[
-                "gpt-4o-mini",
-                "versa-gpt-4o-2024-05-13",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-                "meta-llama/Llama-3.2-11B-Vision-Instruct" 
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     parser.add_argument(
             "--llm-extraction-type",
             type=str,
             default=None,
-            choices=[
-                "gpt-4o-mini",
-                "versa-gpt-4o-2024-05-13",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Llama-3.2-11B-Vision-Instruct",
-                "meta-llama/Meta-Llama-3.1-70B-Instruct"
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     args = parser.parse_args()
     args.partition = "train"
@@ -157,7 +141,8 @@ def main(args):
         batch_size=args.batch_size,
         extraction_file=args.out_extractions,
         is_image=args.is_image,
-        max_section_length=args.max_section_length
+        max_section_length=args.max_section_length,
+        requests_per_second=args.requests_per_second
     )
     
     X_train = common.get_features(concept_dicts, all_extracted_features, data_df, force_keep_columns=args.keep_x_cols)

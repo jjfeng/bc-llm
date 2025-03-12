@@ -60,6 +60,7 @@ class ConceptLearnerModel:
             force_keep_columns: pd.Series = None,
             max_new_tokens: int = 5000,
             num_top: int = 40,
+            requests_per_second: float = None
             ):
         self.init_history = init_history
         self.llm_iter = llm_iter
@@ -86,6 +87,7 @@ class ConceptLearnerModel:
         self.force_keep_columns = force_keep_columns
         self.max_new_tokens = max_new_tokens
         self.num_top = num_top
+        self.requests_per_second= requests_per_second
     
     def fit(self,
             data_df,
@@ -98,7 +100,6 @@ class ConceptLearnerModel:
 
         # initialize concepts
         meta_concept_dicts = history.get_last_concepts()[:self.num_meta_concepts]
-        # breakpoint()
         
         all_extracted_features = common.extract_features_by_llm(
                 self.llm_extraction,
@@ -109,7 +110,8 @@ class ConceptLearnerModel:
                 extraction_file=self.out_extractions_file,
                 batch_size=self.batch_size,
                 is_image=self.is_image,
-                max_section_length=self.max_section_length
+                max_section_length=self.max_section_length,
+                requests_per_second=self.requests_per_second
         )
 
         # do posterior inference
@@ -162,7 +164,6 @@ class ConceptLearnerModel:
                 print(raw_candidate_concept_dicts)
                 
                 # extract candidate concepts
-                # breakpoint()
                 all_extracted_features = common.extract_features_by_llm(
                     self.llm_extraction,
                     data_df, 
@@ -172,7 +173,8 @@ class ConceptLearnerModel:
                     extraction_file=self.out_extractions_file,
                     batch_size=self.batch_size,
                     is_image=self.is_image,
-                    max_section_length=self.max_section_length
+                    max_section_length=self.max_section_length,
+                    requests_per_second=self.requests_per_second
                 )
 
                 if self.do_greedy or (i < self.num_greedy_epochs):
@@ -384,16 +386,20 @@ class ConceptLearnerModel:
             return d
             
 
+        llm_output = llm_output.replace("```json", "").replace("```", "")
         try:
             logging.info("candidate concept summary =================")
             try:
-                outs = llm_output.split('\n')
-                jsons = []
-                for out in outs:
-                    try:
-                        jsons.append(json.loads(out))
-                    except:
-                        pass           
+                try: 
+                    json.loads(llm_output)["concepts"]
+                except:
+                    outs = llm_output.split('\n')
+                    jsons = []
+                    for out in outs:
+                        try:
+                            jsons.append(json.loads(out))
+                        except:
+                            pass           
 
                 # reformat into prior_dicts
                 prior_dicts = []
@@ -431,7 +437,7 @@ class ConceptLearnerModel:
                 prior_dicts[i]['prior'] = default_prior
                 logging.info("CONCEPT %s %s", prior_dicts[i]['concept'], prior_dicts[i])
 
-            assert len(prior_dicts) > 0
+            #assert len(prior_dicts) > 0
         except Exception as e:
             logging.info("ERROR in extracting candidate concepts %s", e)
             raise ValueError("bad JSON llm response")
@@ -443,6 +449,8 @@ class ConceptLearnerModel:
         top_candidates = prior_dicts[:keep_num_candidates]
         logging.info("top candidates %s", top_candidates)
 
+        if len(top_candidates) == 0:
+            logging.info("Error candidate concepts are empty")
         return top_candidates
 
     def _get_prob_concepts_given_D(
@@ -557,7 +565,7 @@ class ConceptLearnerModel:
             for w in feat_names]
         return X_features[:, keep_mask], feat_names[keep_mask]
     
-    def query_for_new_cand(self, iter_llm_prompt, top_feat_names, times_to_retry=4, max_new_tokens=5000):
+    def query_for_new_cand(self, iter_llm_prompt, top_feat_names, times_to_retry=10, max_new_tokens=4000):
         llm_response = self.llm_iter.get_output(iter_llm_prompt, max_new_tokens=max_new_tokens)
         while times_to_retry > 0:
             # breakpoint()

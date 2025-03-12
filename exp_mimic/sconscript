@@ -30,8 +30,6 @@ nest = SConsWrap(Nest(), localenv['output'], alias_environment=localenv)
 MIMIC_DATA = 'exp_mimic/data/mimic_social_history.csv'
 BOOSTING_PROMPT = 'exp_mimic/prompts/boosting_iter.txt'
 
-EXTRACT_LLM_PROMPT = 'exp_mimic/prompts/age.txt'
-
 NUM_EPOCHS = 5  # bayesian epochs
 NUM_GREEDY_EPOCHS = 1
 NUM_BOOST_ITERS = 10
@@ -39,13 +37,23 @@ NUM_NEW_TOKENS = 600
 BATCH_SIZE = 8
 
 LLM_MODELS = [
-    'gpt-4o-mini'
+    'gpt-4o-mini',
+    'cohere-command-r',
     # "meta-llama/Meta-Llama-3.1-8B-Instruct"
     # "meta-llama/Meta-Llama-3.1-70B-Instruct"
     # 'meta-llama/Llama-3.2-11B-Vision-Instruct'
 ]
 LLM_DICT = {
-    'gpt-4o-mini': True,  # true using API
+    'cohere-command-r': {
+        "api": True,  # true using API
+        "extract_prompt": 'exp_mimic/prompts/extract.txt',
+        "conditional": 'exp_mimic/prompts/bayesian_iter_restrict.txt'
+    },
+    'gpt-4o-mini': {
+        "api": True,
+        "extract_prompt": 'exp_mimic/prompts/age.txt',
+        "conditional": 'exp_mimic/prompts/bayesian_iter.txt'
+    }
     # 'meta-llama/Meta-Llama-3.1-8B-Instruct': False,  # False, not using API
     # 'meta-llama/Meta-Llama-3.1-70B-Instruct': False, # False, not using API
     # 'meta-llama/Llama-3.2-11B-Vision-Instruct': False,
@@ -78,7 +86,7 @@ Y_DATA_DICT = {
         "num_meta_concepts": [
             6,
         ],
-        "oracle": 'exp_mimic/oracle_concept5_history.pkl',
+        "oracle": 'exp_mimic/oracle_concept_history.pkl',
     }
 }
 
@@ -678,6 +686,7 @@ def evaluate_boosting(env, outdir, c):
         c['llm_model'],
         '--use-api' if LLM_DICT[c['llm_model']] else '',
         '--result-csv ${TARGETS[1]}',
+        '--calib-plot ${TARGETS[2]}',
     ]
 
     sources = [
@@ -686,9 +695,11 @@ def evaluate_boosting(env, outdir, c):
         c['train_boosting'][0],
         c['test_extractions'],
     ]
+
     targets = [
         path_join(outdir, 'test_boosting_log.txt'),
         path_join(outdir, 'result_boosting.csv'),
+        path_join(outdir, 'calib_boosting.png'),
     ]
     c['result_agg'].append(targets[1])
 

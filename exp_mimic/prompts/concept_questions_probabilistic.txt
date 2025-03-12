@@ -9,4 +9,4 @@ Example answer: {
     "1": 1,
     "2": 0.5
 }
-Answer all the questions and do not answer with anything else besides valid JSON. Do not add comments to the JSON.
+Answer all the questions and do not answer with anything else besides valid JSON.  Each key in the JSON should be an integer for the corresponding concept and each value should be a valid float. Do not add comments to the JSON and ensure your JSON is valid.

@@ -31,4 +31,4 @@ Example:
   ],
 }
 
-Ensure your answer contains {num_meta_concepts} concepts. Your answer:
+Ensure your answer contains {num_meta_concepts} concepts. Do not answer with anything else besides JSON. Please validate your JSON before returning it.

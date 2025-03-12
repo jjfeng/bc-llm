@@ -24,6 +24,7 @@ from src.llm.llm_api import LLMApi
 from src.llm.llm_local import LLMLocal
 from src.training_history import TrainingHistory
 import src.common as common
+from src.llm.constants import *
 
 def parse_args(args):
     """parse command line arguments"""
@@ -57,45 +58,28 @@ def parse_args(args):
     parser.add_argument("--training-history-file", type=str, default=None)
     parser.add_argument("--init-history-file", type=str)
     parser.add_argument("--is-image", action="store_true", default=False)
-    parser.add_argument("--max-new-tokens", type=int, default=5000)
+    parser.add_argument("--max-new-tokens", type=int, default=4000)
     parser.add_argument("--num-top-residual-words", type=int, default=40)
     parser.add_argument("--do-greedy", action="store_true", default=False)
     parser.add_argument("--max-section-length", type=int, default=None)
+    parser.add_argument("--requests-per-second", type=float, default=None)
     parser.add_argument(
             "--llm-model-type",
             type=str,
             default=None,
-            choices=[
-                "gpt-4o-mini",
-                "versa-gpt-4o-2024-05-13",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-                "meta-llama/Llama-3.2-11B-Vision-Instruct" 
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     parser.add_argument(
             "--llm-iter-type",
             type=str,
             default=None,
-            choices=[
-                "gpt-4o-mini",
-                "versa-gpt-4o-2024-05-13",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-                "meta-llama/Llama-3.2-11B-Vision-Instruct" 
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     parser.add_argument(
             "--llm-extraction-type",
             type=str,
             default=None,
-            choices=[
-                "gpt-4o-mini",
-                "versa-gpt-4o-2024-05-13",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-                "meta-llama/Llama-3.2-11B-Vision-Instruct" 
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     args = parser.parse_args()
     args.partition = "train"
@@ -112,7 +96,6 @@ def load_data_partition(args, init_concepts_file=None, text_summary_column: str 
 
     if init_concepts_file is not None:
         dset_init_concepts = pd.read_csv(init_concepts_file)
-        assert np.all(dset_init_concepts.sentence == dset.sentence)
         
         dset['llm_output'] = dset_init_concepts["llm_output"]
 
@@ -239,6 +222,7 @@ def main(args):
         force_keep_columns=args.keep_x_cols,
         num_top=args.num_top_residual_words,
         max_new_tokens=args.max_new_tokens,
+        requests_per_second=args.requests_per_second
     )
     bayesian_cbm.fit(
         data_df,

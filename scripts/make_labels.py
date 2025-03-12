@@ -15,6 +15,7 @@ from sklearn.linear_model import LogisticRegression
 sys.path.append(os.getcwd())
 from src.llm.llm_api import LLMApi
 from src.llm.llm_local import LLMLocal
+from src.llm.constants import *
 import src.common as common
 from src.training_history import TrainingHistory
 
@@ -37,11 +38,7 @@ def parse_args(args):
             "--llm-model-type",
             type=str,
             default="meta-llama/Meta-Llama-3.1-8B-Instruct",
-            choices=[
-                "gpt-4o-mini",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct", 
-                "meta-llama/Meta-Llama-3.1-70B-Instruct", 
-                ]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     args = parser.parse_args()
     args.y_params = np.array(list(map(float, args.y_params.split(","))), dtype=float)

@@ -42,11 +42,11 @@ EXTRACT_LLM_PROMPT_DICT = {
 
 # DO NOT use GPT
 LLM_MODELS = [
-    "versa-gpt-4o-2024-05-13",
+    "versa-gpt-4o-2024-08-06",
     # "meta-llama/Meta-Llama-3.1-70B-Instruct"
 ]
 LLM_DICT = {
-    "versa-gpt-4o-2024-05-13": {
+    "versa-gpt-4o-2024-08-06": {
         "api": True, # using API
         "batch_size": 20,
         "max_extract_length": 2000,
