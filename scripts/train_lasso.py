@@ -15,6 +15,7 @@ from sklearn.linear_model import LogisticRegressionCV
 
 sys.path.append(os.getcwd())
 from scripts.train_concept import make_dataset, setup
+from src.llm.constants import *
 
 def parse_args(args):
     """parse command line arguments"""
@@ -32,7 +33,7 @@ def parse_args(args):
             "--llm-model-type",
             type=str,
             default="meta-llama/Meta-Llama-3-8B-Instruct",
-            choices=["meta-llama/Meta-Llama-3-8B-Instruct"]
+            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     args = parser.parse_args()
     return args

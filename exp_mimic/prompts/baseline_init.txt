@@ -16,4 +16,4 @@ Example answer:
 {"Does the note mention the patient having a history of pneumonia?": "pneumonia"}
 {"Does the note mention the patient being uninsured?": "uninsured, insurance"}
 
-Final answer:
+Ensure your answer contains {num_meta_concepts} concepts. Do not output any other text besides a string of valid JSON. Your answer:

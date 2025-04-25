@@ -143,3 +143,4 @@ _output
 .sconsign.dblite
 /exp_unplanned_admission/data/*
 processed
+exp_cub_birds_existing/CUB_200*

@@ -22,6 +22,7 @@ sys.path.append(os.getcwd())
 
 from src.utils import convert_to_json
 from src.llm.llm_api import LLMApi
+from src.llm.constants import *
 from src.llm.llm_local import LLMLocal
 from src.llm.dataset import TextDataset, ImageDataset
 import src.common as common
@@ -38,6 +39,7 @@ def parse_args(args):
     parser.add_argument("--indices-file", type=str,
                         help="csv of training indices")
     parser.add_argument("--is-image", action="store_true", default=False)
+    parser.add_argument("--requests-per-second", type=float, default=None)
     parser.add_argument("--llm-outputs-file", type=str,
                         help="csv file with llm concepts")
     parser.add_argument("--log-file", type=str,
@@ -50,15 +52,7 @@ def parse_args(args):
     parser.add_argument(
         "--llm-model-type",
         type=str,
-        default="meta-llama/Meta-Llama-3.1-8B-Instruct",
-        choices=[
-                "versa-gpt-4o-2024-05-13",
-                "versa-gpt-4o-mini-2024-07-18",
-                "gpt-4o-mini",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct",
-                "meta-llama/Meta-Llama-3.1-70B-Instruct",
-                "meta-llama/Llama-3.2-11B-Vision-Instruct" 
-                ]
+        choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
             )
     args = parser.parse_args()
     return args
@@ -107,6 +101,7 @@ def main(args):
             prompt_template
         )
     else:
+        new_data_df = new_data_df.dropna(subset=['sentence'])
         group_ids, sentences = common.split_sentences_by_id(
             new_data_df,
             args.max_section_length
@@ -148,7 +143,8 @@ def main(args):
             is_image=args.is_image,
             validation_func=lambda x: [
                 convert_to_json(elem, logging) for elem in x],
-            callback=write_llm_outputs
+            callback=write_llm_outputs,
+            requests_per_second=args.requests_per_second
         ))
     else:
         llm = LLMLocal(args.seed, args.llm_model_type, logging)

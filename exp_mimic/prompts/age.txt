@@ -4,6 +4,7 @@ Output a list of descriptors that summarizes the patient case (such as aspects o
 {
 "1": "<STRING_OF_DESCRIPTOR1_AND_SYNONYMS_AND_GENERALIZATIONS>",
 "2": "<STRING_OF_DESCRIPTOR2_AND_SYNONYMS_AND_GENERALIZATIONS>",
+"3": "<STRING_OF_DESCRIPTOR3_AND_SYNONYMS_AND_GENERALIZATIONS>",
 ...
 }
 

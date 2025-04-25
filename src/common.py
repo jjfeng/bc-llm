@@ -20,7 +20,7 @@ from src.llm.llm import LLM
 TABULAR_PREFIX = "Tabular feature: "
 
 
-def query_and_parse_llm(llm, llm_prompt, extract_func, times_to_retry=4, default_response=None):
+def query_and_parse_llm(llm, llm_prompt, extract_func, times_to_retry=10, default_response=None):
     llm_response = llm.get_output(llm_prompt, max_new_tokens=2500)
     print(llm_response)
     while times_to_retry > 0:
@@ -63,7 +63,8 @@ def extract_features_by_llm(
         is_image=False,
         max_retries: int = 2,
         max_num_concepts_extract: int = 11,
-        max_section_length: int = None
+        max_section_length: int = None,
+        requests_per_second: float = None
 ) -> dict[str, np.ndarray]:
     logging.info("LLM %s", llm.model_type)
     # Determine which new concepts to extract
@@ -91,7 +92,8 @@ def extract_features_by_llm(
                 max_new_tokens,
                 is_image,
                 max_retries,
-                max_section_length
+                max_section_length,
+                requests_per_second
             )
     return all_extracted_features_dict
 
@@ -136,7 +138,8 @@ def _extract_features_by_llm_batch(
         max_new_tokens=150,
         is_image=False,
         max_retries: int = 3,
-        max_section_length: int = None
+        max_section_length: int = None,
+        requests_per_second: float=None
 ) -> dict[str, np.ndarray]:
     # Determine which new concepts to extract
     concepts_in_meta = [concept_dict["concept"]
@@ -184,6 +187,7 @@ def _extract_features_by_llm_batch(
                 validation_func=lambda x: [_extract_features_json(
                     elem, logging, num_concepts=num_to_extract) for elem in x],
                 max_retries=max_retries,
+                requests_per_second=requests_per_second
             )
         )
     else:
@@ -300,7 +304,7 @@ def train_LR(X_train, y_train, penalty=None) -> dict:
             }
 
     if penalty is None:
-        model = LogisticRegression(penalty=None)
+        model = LogisticRegression(max_iter=20000, penalty=None)
     elif penalty == 'l2':
         model = LogisticRegressionCV(
             max_iter=10000, Cs=20, solver="lbfgs", **args)
