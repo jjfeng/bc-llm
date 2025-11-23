@@ -1,0 +1,39 @@
+We are fitting a concept bottleneck model for classifying the species of a bird based on the attributes of the bird in its image. The goal is to come up with {num_meta_concepts} meta-concepts to extract from the images to maximize the accuracy of the concept bottleneck model.
+
+Based on the top words most associated with the outcome Y estimated using a simple logistic regression model with tf-idf features, come up with {num_meta_concepts} meta-concepts. A meta-concept has to be defined in terms of a yes/no question, e.g. Does the bird in the image have blue feathers? The concept should be defined in a way that is associated with the outcome Y, so for words that typically correspond to a "yes" answer for the question should have large positive coefficients, whereas words that typically correspond to a "no" answer should have very negative coefficients. You can also propose meta-concepts that only correspond to a single word. Pick meta-concepts that are as specific as possible, without being too broad. Meta-concepts should be questions about the attributes in an image.
+
+Words with top coefficients (absolute value):
+
+{top_features_df}
+
+First discuss your reasoning and then finalize a list of candidate concepts. You should group together candidate concepts that are basically synonyms or antonyms. The final output should have the following JSON format:
+{
+    "reasoning": "<REASONING>",
+    "concepts":
+    [
+      {
+          "concept": "<CANDIDATE META CONCEPT>",
+          "words": <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF THIS CONCEPT>
+      },
+      ...
+    ],
+}
+
+Example:
+{
+    "reasoning": "Attributes ... and ... are very similar so I will group them together into a new candidate concept relating to ... I will also group together ... The remaining can stand as individual concepts."
+    "concepts":
+    [
+      {
+          "concept": "Does the bird in the image have blue feathers?",
+          "words": "blue feathers"
+      },
+      {
+          "concept": "Does the bird in the image have a curved beak?",
+          "words": "curved beak"
+      },
+      ...
+    ]
+}
+
+Ensure your answer contains {num_meta_concepts} concepts. Your answer:

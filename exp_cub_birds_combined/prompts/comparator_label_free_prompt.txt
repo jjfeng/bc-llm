@@ -1,0 +1,29 @@
+I will give you a series of questions about the list of images. For each image, your task is answer each question with a probability from 0 to 1. If the question asks about a feature that is obscured (e.g. "does the image depict a bird with black feet?"), reason about what you see and then provide your best guess in terms of a probability. Summarize the response with a JSON that includes your answer to all of the questions, whenever the answer is nonzero (i.e. the answers should be provided in a format). Answer in a sparse format, providing answers to only attributes whose values are nonzero.
+Questions:
+{prompt_questions}
+
+Example output:
+{
+    "reasoning": "The image does not have attributes listed in questions 2,5... so I will omit those in the final JSON. The remaining questions I will fill with ones or probabilities."
+    "extractions":
+    [
+        {
+            "question": 1,
+            "reasoning": "<REASONING FOR THIS QUESTION>",
+            "answer": 1
+        },
+        {
+            "question": 3,
+            "reasoning": "The feet are obscured so there is a small chance this bird is... So I will fill in 0.1.",
+            "answer": 0.1
+        },
+        {
+            "question": 4,
+            "reasoning": "The belly is obscured but this bird is either a ... or a ..., so I will fill in 0.5 for question...",
+            "answer": 0.5
+        },
+        ...
+    ]
+}
+
+Answer all the questions and do not answer with anything else besides valid JSON. Your answer:

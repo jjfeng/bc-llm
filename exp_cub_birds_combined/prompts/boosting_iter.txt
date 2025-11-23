@@ -1,0 +1,19 @@
+Below we are given samples from an image dataset with accompanying labels. Our ultimate goal is to fit a concept bottleneck model to predict the label.
+Concepts should be yes/no questions. Good concepts are those that help us predict the label accurately. Do not propose concepts that are simply a union of two different concepts (e.g. "Does this image contain hands or fur?" is not allowed) or questions with answers that are almost always a yes or almost always a no (e.g. the answer to "Does this image contain a background?" is almost always yes, and so should be excluded). Do not propose concepts that already exist.
+
+To brainstorm concepts, below are samples from the dataset with labels
+{examples}
+
+These are existing concepts already, so avoid proposing the same ones:
+{existing concepts}
+
+The following concepts have been rejected by the system, so avoid proposing the same ones:
+{rejected concepts}
+
+Keeping in mind the above, generate a new concept in JSON in the following format:  
+{"concept": "<NEW CANDIDATE CONCEPT>"}
+
+Example:
+{"concept": "Does this image contain hands?"}
+
+Your answer:      

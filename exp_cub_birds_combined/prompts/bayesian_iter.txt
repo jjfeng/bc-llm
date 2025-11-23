@@ -1,0 +1,40 @@
+We are fitting a concept bottleneck model for classifying the species of a bird based on the attributes of the bird in its image. The goal is to come up with {num_concepts} meta-concepts to extract from the images to maximize the accuracy of the concept bottleneck model. A meta-concept is a binary feature extractor defined by a yes/no question. We have {num_concepts_fixed} meta-concepts so far:
+{meta_concepts}
+
+To come up with candidates for the {num_concepts}th meta-concept, I have done the following: I first fit a CBM on the {num_concepts_fixed} existing meta-concepts. Then to figure out how to improve this {num_concepts_fixed}-concept CBM, I first asked an LLM to extract a list of attributes that are present in each image, and then fit a linear regression model on the extracted attributes to predict the residuals of the {num_concepts_fixed}-concept CBM. These are the top extracted attributes in the resulting residual model, in decreasing order of their coefficients (absolute value):
+
+{top_features_df}
+
+Given the residual model, create cohesive candidates for the {num_concepts}th meta-concept. Be systematic by working through ALL {num_attributes} attributes in the residual model one by one, starting from the most to the least predictive. For each attribute, check if it matches an existing meta-concept or create a new candidate meta-concept. All attributes should correspond to at least one candidate. Work down the list, iterating through each attribute. Clearly state each candidate meta-concept as a yes/no question.
+
+Suggestions for generating candidate meta-concepts: Do not propose meta-concepts that are simply a union of two different concepts (e.g. "Does this image depict a bird with brown feathers or a curved beak?" is not allowed) or questions with answers that are almost always a yes (e.g. the answer to "Does this image depict a bird?" is always a yes for this dataset, and so should be excluded). Do not propose meta-concepts where you would expect over 95% agreement or disagreement with the {num_concepts_fixed} existing meta-concepts (e.g. "Does the image show a bird with dark coloring?" overlaps too much with "Does the image show a dark-colored bird?").
+
+Write your reasoning and summarize all the generated candidates for the remaining meta-concepts in a JSON. In the JSON, include a list of phrases that mean the same or opposite of each candidate meta-concept. The final JSON should have the following format:
+{
+    "reasoning": "<REASONING FOR EACH ATTRIBUTE>",
+    "concepts":
+    [
+      {
+          "concept": "<CANDIDATE META CONCEPT>",
+          "words": <LIST OF WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF THIS CONCEPT>
+      },
+      ...
+    ]
+}
+
+Example:
+{
+    "reasoning": "1. The first attribute is... This can correspond to a concept such as 'Does this image depict a bird with...?'\n 2. The second attribute is very similar to the first concept, so we can propose a more general concept such as 'Does this image depict a bird with...?'\n 3. The third concept is too similar to an existing meta-concept so we can skip it.\n 4. This attribute can form a new meta-concept ..."
+    "concepts":
+    [
+      {
+          "concept": "Does the image depict a bird that has black feet?",
+          "words": ["dark feet", "black feet"]
+      },
+      {
+          "concept": "Does the image depiect a bird that has a curved beak?",
+          "words": ["curved beak"]
+      },
+      ...
+    ]
+}
