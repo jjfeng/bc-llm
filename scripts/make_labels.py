@@ -13,9 +13,6 @@ from sklearn.metrics import roc_auc_score
 from sklearn.linear_model import LogisticRegression
 
 sys.path.append(os.getcwd())
-from src.llm.llm_api import LLMApi
-from src.llm.llm_local import LLMLocal
-from src.llm.constants import *
 import src.common as common
 from src.training_history import TrainingHistory
 
@@ -27,19 +24,11 @@ def parse_args(args):
     parser.add_argument("--y-params", type=str, help="coef and intercept for y model, comma separated")
     parser.add_argument("--in-dataset-file", type=str, help="csv of the data we want to learn concepts for")
     parser.add_argument("--columns", nargs="*", type=str, help="the columns in the data to use for making the labels")
-    parser.add_argument("--in-training-history-file", type=str, default=None)
     parser.add_argument("--out-extractions", type=str, default="_output/note_extractions.pkl")
     parser.add_argument("--prompt-concepts-file", type=str, default="exp_multi_concept/prompts/concept_questions.txt")
-    parser.add_argument("--use-api", action="store_true")
     parser.add_argument("--log-file", type=str, help="log file")
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--labelled-data-file", type=str, help="csv file with the necessary data elements for training model")
-    parser.add_argument(
-            "--llm-model-type",
-            type=str,
-            default="meta-llama/Meta-Llama-3.1-8B-Instruct",
-            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
-            )
     args = parser.parse_args()
     args.y_params = np.array(list(map(float, args.y_params.split(","))), dtype=float)
     return args
@@ -73,45 +62,6 @@ def main(args):
     coefs = args.y_params[coef_idxs].reshape((-1,1))
     if args.columns:
         x = notes_df[args.columns].to_numpy()
-    elif args.in_training_history_file is not None:
-        history = TrainingHistory().load(args.in_training_history_file)
-        concept_dicts = history.get_last_concepts()
-        if args.use_api:
-            llm = LLMApi(args.seed, args.llm_model_type, logging)
-        else:
-            llm = LLMLocal(args.seed, args.llm_model_type, logging)
-        all_extracted_features = {}
-        if os.path.exists(args.out_extractions):
-            with open(args.out_extractions, "rb") as f:
-                all_extracted_features = pickle.load(f)
-        all_extracted_features = common.extract_features_by_llm(
-            llm, 
-            notes_df,
-            concept_dicts,
-            all_extracted_features_dict=all_extracted_features,
-            prompt_file=args.prompt_concepts_file,
-            batch_size=args.batch_size,
-            extraction_file=args.out_extractions
-        )
-        x = np.concatenate(
-            [all_extracted_features[concept_dict["concept"]] for concept_dict in concept_dicts],
-            axis=1
-            )
-        
-        # HACK: PURELY FOR CHECKING agreement between MIMIC annotations and LLM annotations
-        # column_mappings = [
-        #     ["label_employment_False"],
-        #     ['label_alcohol_Present', 'label_alcohol_Past'],
-        #     ['label_tobacco_Present', 'label_tobacco_Past'],
-        #     ['label_drugs_Present']
-        # ]
-        # for i, mapped_cols in enumerate(column_mappings):
-        #     logging.info("COLUMN MAPPING %s", mapped_cols)
-        #     x_col_given = 0
-        #     for c in mapped_cols:
-        #         x_col_given += notes_df[c].to_numpy()
-        #     agreement_rate = np.mean(x[:,i] == x_col_given)
-        #     logging.info(f"agreement rate col{i}: agree {agreement_rate}")
     else:
         x = notes_df.iloc[:,coef_idxs].to_numpy()
     logging.info("X MEAN %s", x.mean(axis=0))

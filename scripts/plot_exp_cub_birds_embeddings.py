@@ -46,20 +46,13 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def get_equiv_str(concept):
-    if concept == "Does this image contain bright feathers?":
-        return "Does this image depict a bird with bright feathers?"
-    elif concept == "Does this image feature an orange chest?":
-        return "Does this image feature a bird with an orange chest?"
-    else:
-        return concept
-
 def make_clean_str(concept):
     image_verbs = ["depict", "represent", "illustrate", "show", "contain", "feature", "include", "portray", "have", "showcase"]
     for verb in image_verbs:
         concept = concept.replace(f"Does this image {verb} ", "")
         concept = concept.replace(f"Does the image {verb} ", "")
-    concept = concept.replace(f"a bird found in an oceanic environment", "an ocean environment")
+        concept = concept.replace(f"Does the bird in the image {verb} ", "")
+    concept = concept.replace(f"Is the bird in a ", "")
     return concept.replace("?", "").replace("a bird with ", "").replace("a bird in ", "").replace("birds with ", "").replace("a bird that is ", "")
 
 def dist_func(x, y):
@@ -73,47 +66,54 @@ def main():
     args = parse_args()
     np.random.seed(args.seed)
 
-    all_extracted_features = {}
-    for extraction_file in args.extraction_files:
-        with open(extraction_file, "rb") as f:
-            all_extracted_features = all_extracted_features | pickle.load(f)
-    print(all_extracted_features.keys())
+    print(args.history_files)
+    print(args.extraction_files)
 
     all_concepts_df = []
-    all_concept_sizes = []
-    all_concepts_to_embed_dfs = []
-    for idx, history_file in enumerate(args.history_files):
+    all_extracted_features = []
+    for idx, (history_file, extraction_file) in enumerate(zip(args.history_files, args.extraction_files)):
+        with open(extraction_file, "rb") as f:
+            all_extracted_features.append(pickle.load(f))
+            key_list = list(all_extracted_features[-1].keys())
+            for k in key_list:
+                all_extracted_features[-1][make_clean_str(k)] = all_extracted_features[-1][k]
+            
         print("history", idx)
         logging.info(f"========history file {history_file}")
         history = TrainingHistory().load(history_file)
         start_iter = max(0, history.num_iters - args.num_posterior_iters)
-        concepts_to_embed = list(
+        concepts_to_embed = pd.Series(
             [
-                get_equiv_str(concept_dict['concept'])
+                make_clean_str(concept_dict['concept'])
                 for concept_dicts in history._concepts[start_iter:history.num_iters] for concept_dict in concept_dicts
             ])
-        concepts_to_embed = pd.Series(concepts_to_embed)
-        concepts_to_embed_df = concepts_to_embed.value_counts()/(history.num_iters - start_iter + 1)
-        all_concepts_to_embed_dfs.append(concepts_to_embed_df)
-        posterior_probs = concepts_to_embed_df.to_numpy()
-        concepts_df = pd.DataFrame({
-            concepts_to_embed_df.index[c_idx]: [posterior_probs[c_idx]]
-            for c_idx in np.arange(concepts_to_embed_df.index.size)
-        })
+        concepts_df = concepts_to_embed.value_counts()/(history.num_iters - start_iter + 1)
         all_concepts_df.append(concepts_df)
-        all_concept_sizes.append((100 * posterior_probs)**2)
     
     _, axes = plt.subplots(nrows=1, ncols=2, figsize=(10,5))
-    for plot_idx, idx in enumerate([0,1]):
-        concepts_df = all_concepts_df[idx].T
+    for plot_idx in range(len(all_extracted_features)):
+        concepts_df = all_concepts_df[plot_idx].T
+        curr_feat_dict = all_extracted_features[plot_idx]
         print(concepts_df)
-        all_embeddings = np.array([all_extracted_features[c][:,0] for c in concepts_df.index])
-        Z = scipy.cluster.hierarchy.linkage(all_embeddings, 'average', metric=dist_func)
+        
+        all_embeddings = np.array([curr_feat_dict[c][:,0] for c in concepts_df.index])
+        labels = [make_clean_str(txt + f" ({weight:.2f})") for txt, weight in zip(concepts_df.index, concepts_df)]
+        print("labels", labels)
+        keep_labels = []
+        keep_embeddings = []
+        for label, embedding in zip(labels, all_embeddings):
+            if label in keep_labels:
+                continue
+            else:
+                keep_labels.append(label)
+                keep_embeddings.append(embedding)
+        print(all_embeddings)
+        Z = scipy.cluster.hierarchy.linkage(keep_embeddings, 'average', metric=dist_func)
         hierarchy.dendrogram(
             Z,
-            labels=[make_clean_str(txt + f" ({weight:.2f})") for txt, weight in zip(concepts_df.index, concepts_df[0])],
+            labels=keep_labels,
             leaf_rotation=0,
-            ax=axes[plot_idx] if len(all_concepts_df) > 1 else axes,
+            ax=axes[plot_idx], # if len(all_concepts_df) > 1 else axes,
             color_threshold=0,
             orientation='right')
     plt.tight_layout()

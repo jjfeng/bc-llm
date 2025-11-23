@@ -28,3 +28,12 @@ sc.SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'exp_clinical_notes'
 sc.SConscript(flag + '/sconscript', exports=['flag'])
+
+flag = 'exp_imagenette'
+sc.SConscript(flag + '/sconscript', exports=['flag'])
+
+flag = 'exp_satellites'
+sc.SConscript(flag + '/sconscript', exports=['flag'])
+
+flag = 'exp_cub_birds_combined'
+sc.SConscript(flag + '/sconscript', exports=['flag'])

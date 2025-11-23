@@ -16,7 +16,6 @@ def parse_args(args):
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--do-case-control-sampling", action="store_true", default=False)
     parser.add_argument("--max-obs", type=int, default=None)
     parser.add_argument("--test-frac", type=float, default=0.1)
     parser.add_argument("--data-csv", type=str)
@@ -43,28 +42,10 @@ def main(args):
 
     # split data into train/ test/ validation
     print("INDEX", data_df.index)
-    if args.do_case_control_sampling:
-        num_cases = num_obs//2
-        num_controls = num_obs - num_cases
-        print("CASES", np.where(data_df.y == 1)[0])
-        case_idxs = np.random.choice(np.where(data_df.y == 1)[0], num_cases, replace=False)
-        print("case_idxs", case_idxs.size, case_idxs[:10])
-        control_idxs = np.random.choice(np.where(data_df.y == 0)[0], num_controls, replace=False)
-        print("control_idxs", control_idxs.size, control_idxs[:10])
-        rand_idxs = np.concatenate([case_idxs, control_idxs])
-        np.random.shuffle(rand_idxs)
-        df = pd.DataFrame({
-            "idx": rand_idxs,
-            "partition": _split(num_obs, args.test_frac)
-        }).sort_values('partition', ascending=True)
-        print(df)
-        print(df.idx[df.partition == "test"])
-        print("pREVALENCE", data_df.y[df.idx[df.partition == "test"]].mean())
-    else:
-        df = pd.DataFrame({
-            "idx": np.random.choice(data_df.index, num_obs, replace=False),
-            "partition": _split(num_obs, args.test_frac)
-        }).sort_values('partition', ascending=True)
+    df = pd.DataFrame({
+        "idx": np.random.choice(data_df.index, num_obs, replace=False),
+        "partition": _split(num_obs, args.test_frac)
+    }).sort_values('partition', ascending=True)
     
     df.to_csv(args.indices_csv, index=False)
 

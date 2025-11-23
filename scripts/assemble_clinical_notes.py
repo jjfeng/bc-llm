@@ -38,7 +38,7 @@ def parse_args(args):
                         )
     parser.add_argument("--out-csv", type=str,
                         help="the name of the output csv")
-    parser.add_argument("--log-file", type=str, default="_output/zsfg_log.txt",
+    parser.add_argument("--log-file", type=str, default="_output/log.txt",
                         help="log file")
     args = parser.parse_args()
     return args

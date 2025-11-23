@@ -15,21 +15,24 @@ import matplotlib.image as mpimg
 from matplotlib import pyplot as plt
 import re
 
-
 sys.path.append(os.getcwd())
-from src.llm.llm_api import LLMApi
+sys.path.append('llm-api-main')
+
+from lab_llm.llm_api import LLMApi
 from src.utils import convert_to_json
-from src.llm.llm_local import LLMLocal
 import src.common as common
 from src.training_history import TrainingHistory
-from scripts.train_bayesian import load_data_partition
-from src.llm.constants import *
+from scripts.train_bayesian import load_data_partition, load_llms
+from lab_llm.error_callback_handler import ErrorCallbackHandler
+from lab_llm.duckdb_handler import DuckDBHandler
+from lab_llm.llm_cache import LLMCache
 
 def parse_args(args):
     """parse command line arguments"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--max-obs", type=int, default=50000)
+    parser.add_argument("--cache-file", type=str, default="cache.db")
     parser.add_argument("--in-dataset-file", type=str,
                         help="csv of the labelled training data")
     parser.add_argument("--keep-x-cols", type=str, nargs="*",
@@ -51,19 +54,18 @@ def parse_args(args):
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--in-training-history-file", type=str, default=None)
     parser.add_argument("--out-training-history-file", type=str, default=None)
-    parser.add_argument("--out-extractions", type=str,
-                        default="_output/boosting_extractions.pkl")
+    # parser.add_argument("--out-extractions", type=str,
+    #                     default="_output/boosting_extractions.pkl")
     parser.add_argument("--is-image", action="store_true", default=False)
     parser.add_argument("--num-iters", type=int, default=30)
     parser.add_argument("--threshold", type=float, default=.0)
-    parser.add_argument("--requests-per-second", type=float, default=None)
     parser.add_argument(
         "--llm-model-type",
         type=str,
-        default="meta-llama/Meta-Llama-3.1-8B-Instruct",
-        choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
-            )
+        )
     args = parser.parse_args()
+    args.llm_iter_type = None
+    args.llm_extraction_type = None
     args.partition = "train"
     args.keep_x_cols = pd.Series(
         args.keep_x_cols) if args.keep_x_cols is not None else None
@@ -189,22 +191,18 @@ def get_X_train(all_extracted_features, concept_dicts):
 
 
 def extract_features_and_train(llm, data_df, concept_dicts, all_extracted_features, args, history, y_train, force_keep_cols: pd.Series = None):
-    all_extracted_features = common.extract_features_by_llm(
+    all_extracted_features = common.extract_features_by_llm_grouped(
         llm,
         data_df,
         meta_concept_dicts=concept_dicts,
-        all_extracted_features_dict=all_extracted_features,
         prompt_file=args.prompt_concepts_file,
         batch_size=args.batch_size,
-        extraction_file=args.out_extractions,
         is_image=args.is_image,
         max_section_length=args.max_section_length,
-        requests_per_second=args.requests_per_second
     )
 
     X_train = common.get_features(
         concept_dicts, all_extracted_features, data_df, force_keep_columns=args.keep_x_cols)
-
     model_results = common.train_LR(X_train, y_train, penalty=None)
 
     return all_extracted_features, model_results
@@ -216,6 +214,8 @@ def main(args):
                         filename=args.log_file, level=logging.INFO)
     logging.info(args)
     np.random.seed(args.seed)
+    args.cache = LLMCache(DuckDBHandler(args.cache_file))
+
     history = TrainingHistory(force_keep_cols=args.keep_x_cols)
 
     data_df = load_data_partition(args)
@@ -226,10 +226,6 @@ def main(args):
     logging.info("data_df shape %s", data_df.shape)
 
     all_extracted_features = {}
-    if os.path.exists(args.out_extractions):
-        with open(args.out_extractions, "rb") as f:
-            all_extracted_features = pickle.load(f)
-
     concept_dicts = []
     if args.in_training_history_file is not None:
         history = history.load(args.in_training_history_file)
@@ -237,11 +233,8 @@ def main(args):
         concept_dicts = history.get_last_concepts()
         history.add_concepts(concept_dicts)
 
-    if args.use_api:
-        llm = LLMApi(args.seed, args.llm_model_type, logging)
-    else:
-        llm = LLMLocal(args.seed, args.llm_model_type, logging)
-
+    llm = load_llms(args)["iter"]
+    
     concept_questions = [concept_dict["concept"]
                          for concept_dict in concept_dicts]
     logging.info("Initial concepts %s", concept_questions)
@@ -259,11 +252,11 @@ def main(args):
             num_samples=args.num_boost_samples,
         )
         print(llm_prompt)
-        llm_response = llm.get_output(
-            llm_prompt, max_new_tokens=2500, is_image=args.is_image)
-        print(llm_response)
+        llm_response = llm.get_output(llm_prompt, max_new_tokens=2500)
         new_concept_dict = get_candidate_concept(llm_response)
+        print("new_concept_dict", new_concept_dict)
         proposal_concept_dicts = concept_dicts + [new_concept_dict]
+        print("proposal_concept_dicts", proposal_concept_dicts)
         # breakpoint()
         all_extracted_features, model_results = extract_features_and_train(
             llm,

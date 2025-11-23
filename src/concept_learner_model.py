@@ -11,17 +11,20 @@ import pickle
 from tqdm import tqdm
 import asyncio
 import scipy
+from typing import List, Optional
 
 from sklearn.metrics import roc_auc_score
 from sklearn.linear_model import LogisticRegression
 from scipy.stats import multivariate_normal
 from sklearn.model_selection import train_test_split
 
-sys.path.append(os.getcwd())
-from src.llm.llm import LLM
+sys.path.append('llm-api-main')
+from lab_llm.llm_api import LLMApi
 from src.utils import convert_to_json, convert_to_list_of_jsons
 from src.training_history import TrainingHistory
 import src.common as common
+from src.llm_response_types import PriorResponse, CandidateConcepts
+
 
 class ConceptLearnerModel:
     """
@@ -34,25 +37,32 @@ class ConceptLearnerModel:
     # Number of observations to show each iter
     num_show_obs = 3
     # number of candidate concepts to test each iter
-    keep_num_candidates = 10
+    keep_num_candidates = 20
+    # max candidate concepts to consider per iter
+    max_candidates_to_consider = 10
     def __init__(
             self,
             init_history: TrainingHistory,
-            llm_iter: LLM,
-            llm_extraction: LLM,
+            llm_iter: LLMApi,
+            llm_extraction: LLMApi,
             num_classes: int,
             num_meta_concepts: int,
             prompt_iter_type: str,
             prompt_iter_file: str,
+            config: dict,
             prompt_concepts_file: str,
             prompt_prior_file: str,
             out_extractions_file: str,
             residual_model_type: str,
+            final_learner_type: str,
             inverse_penalty_param: float, # inverse regularization for the l2 penalty for logistic regression
             train_frac: float = 0.5,
             num_greedy_epochs: int = 0,
             max_epochs: int = 10,
             batch_size: int = 4,
+            batch_concept_size: int = 20,
+            batch_obs_size: int = 1,
+            num_greedy_holdout: int = 1,
             do_greedy: bool = False,
             is_image: bool = False,
             all_extracted_features_dict = {},
@@ -60,7 +70,8 @@ class ConceptLearnerModel:
             force_keep_columns: pd.Series = None,
             max_new_tokens: int = 5000,
             num_top: int = 40,
-            requests_per_second: float = None
+            num_minibatch: int = None,
+            is_greedy_metric_acc: bool = False
             ):
         self.init_history = init_history
         self.llm_iter = llm_iter
@@ -69,7 +80,9 @@ class ConceptLearnerModel:
         self.is_multiclass = num_classes > 2
         self.num_meta_concepts = num_meta_concepts
         self.prompt_iter_type = prompt_iter_type
+        self.num_greedy_holdout = num_greedy_holdout
         assert self.prompt_iter_type == "conditional"
+        self.config = config
         self.prompt_iter_file = prompt_iter_file
         self.prompt_concepts_file = prompt_concepts_file
         self.prompt_prior_file = prompt_prior_file
@@ -80,14 +93,21 @@ class ConceptLearnerModel:
         self.num_greedy_epochs = num_greedy_epochs
         self.max_epochs = max_epochs
         self.batch_size = batch_size
+        self.batch_obs_size = batch_obs_size
         self.all_extracted_features_dict = all_extracted_features_dict
         self.is_image = is_image
         self.do_greedy = do_greedy
+        self.is_greedy_metric_acc = is_greedy_metric_acc
         self.max_section_length = max_section_length
         self.force_keep_columns = force_keep_columns
         self.max_new_tokens = max_new_tokens
+        self.num_minibatch = num_minibatch
         self.num_top = num_top
-        self.requests_per_second= requests_per_second
+        self.batch_concept_size = batch_concept_size
+        self.final_learner_type = final_learner_type
+
+        assert self.num_minibatch is None
+        assert self.num_meta_concepts % self.num_greedy_holdout == 0
     
     def fit(self,
             data_df,
@@ -96,139 +116,154 @@ class ConceptLearnerModel:
             training_history_file: str,
             aucs_plot_file: str):
         history = self.init_history
-        y_train = data_df['y'].to_numpy().flatten()
-
         # initialize concepts
         meta_concept_dicts = history.get_last_concepts()[:self.num_meta_concepts]
-        
-        all_extracted_features = common.extract_features_by_llm(
-                self.llm_extraction,
-                data_df,
-                meta_concept_dicts=meta_concept_dicts[:self.num_meta_concepts],
-                all_extracted_features_dict=self.all_extracted_features_dict,
-                prompt_file=self.prompt_concepts_file,
-                extraction_file=self.out_extractions_file,
-                batch_size=self.batch_size,
-                is_image=self.is_image,
-                max_section_length=self.max_section_length,
-                requests_per_second=self.requests_per_second
-        )
 
         # do posterior inference
+        minibatch_extracted_features = {}
+        all_extracted_features = {}
         for i in range(self.max_epochs):
             st_time = time.time()
-            for j in range(self.num_meta_concepts):
+            is_iter_greedy = self.do_greedy or (i < self.num_greedy_epochs)
+            num_concept_holdout = self.num_greedy_holdout if is_iter_greedy else 1
+            for j in range(0, self.num_meta_concepts, num_concept_holdout):
+                # If minibatch, then subset data first
+                minibatch_df = data_df
+                minibatch_X_features = X_features
+                minibatch_y_train = minibatch_df['y'].to_numpy().flatten()
+
+                all_extracted_features = common.extract_features_by_llm_grouped(
+                    self.llm_extraction,
+                    minibatch_df,
+                    meta_concept_dicts=meta_concept_dicts[:self.num_meta_concepts],
+                    all_extracted_features_dict=all_extracted_features,
+                    prompt_file=self.prompt_concepts_file,
+                    batch_size=self.batch_size,
+                    max_new_tokens=8000,
+                    batch_concept_size=self.batch_concept_size,
+                    group_size=self.batch_obs_size,
+                    is_image=self.is_image,
+                    max_section_length=self.max_section_length,
+                )
+
                 # randomly pick portion of data for generating LLM prior
-                train_size = int(data_df.shape[0] * self.train_frac)
-                train_idx, test_idx = train_test_split(np.arange(data_df.shape[0]), train_size=train_size, stratify=y_train)
+                train_size = int(minibatch_df.shape[0] * self.train_frac)
+                train_idx, test_idx = train_test_split(np.arange(minibatch_df.shape[0]), train_size=train_size, stratify=minibatch_y_train)
                 
                 num_iter = i * self.num_meta_concepts + j
                 # All extracted concepts
                 history.add_concepts(meta_concept_dicts)
-                logging.info("Iteration %d concepts %s", num_iter, meta_concept_dicts)
-                all_concept_extract_feat = common.get_features(meta_concept_dicts, all_extracted_features, data_df, force_keep_columns=self.force_keep_columns)
-                train_results = common.train_LR(all_concept_extract_feat, y_train)
+                logging.info("Iteration %d concepts %s (tot %d)", num_iter, [c['concept'] for c in meta_concept_dicts[:max(num_concept_holdout * 2, 10)]], len(meta_concept_dicts))
+                all_concept_extract_feat = common.get_features(meta_concept_dicts, all_extracted_features, minibatch_df, force_keep_columns=self.force_keep_columns)
+                train_results = common.train_LR(
+                    all_concept_extract_feat,
+                    minibatch_y_train,
+                    penalty=self.final_learner_type, # this technically should be none from a bayesian perspective
+                    use_acc=self.is_greedy_metric_acc)
                 logging.info("All extracted concepts AUC %f", train_results["auc"])
+                logging.info("All extracted concepts ACC %f", train_results["acc"])
                 # coefficients should follow from bayesian model. But it is ok for now...
                 history.add_auc(train_results["auc"])
                 history.add_coef(train_results["coef"])
                 logging.info('All extracted concepts coef %s', train_results["coef"])
                 history.add_intercept(train_results["intercept"])
                 history.add_model(train_results["model"])
+                history.save(training_history_file)
+                history.plot_aucs(aucs_plot_file)
 
                 # Extracted features minus the held out concept
-                concept_subset_dicts = meta_concept_dicts[:(self.num_meta_concepts - 1)]
+                concept_subset_dicts = meta_concept_dicts[:(self.num_meta_concepts - num_concept_holdout)]
                 concept_subset = []
                 for k, c in enumerate(concept_subset_dicts):
                     print("CURRENT META-CONCEPT", k, c["concept"])
                     concept_subset.append(c['concept'])
 
                 # generate LLM prior, dropping one concept from the mix
-                extracted_features = common.get_features(concept_subset_dicts, all_extracted_features, data_df, force_keep_columns=self.force_keep_columns)
+                extracted_features = common.get_features(concept_subset_dicts, all_extracted_features, minibatch_df, force_keep_columns=self.force_keep_columns)
 
-                X_scrubbed, feat_names_scrubbed = self.scrub_vectorized_sentences(X_features, feat_names, concept_subset_dicts)
-                concept_to_replace = meta_concept_dicts[self.num_meta_concepts - 1]
+                X_scrubbed, feat_names_scrubbed = self.scrub_vectorized_sentences(minibatch_X_features, feat_names, concept_subset_dicts)
+                concepts_to_replace = meta_concept_dicts[-num_concept_holdout:]
                 iter_llm_prompt, meta_concepts_text, top_features_text, top_feat_names = self.make_new_concept_prompt(
                     X_extracted=extracted_features[train_idx],
                     X_words=X_scrubbed[train_idx],
-                    y = y_train[train_idx],
-                    data_df = data_df.iloc[train_idx],
+                    y = minibatch_y_train[train_idx],
+                    data_df = minibatch_df.iloc[train_idx],
                     extract_feature_names=concept_subset,
-                    concept_to_replace=concept_to_replace["concept"],
-                    feat_names=feat_names_scrubbed)
-                print(iter_llm_prompt)
+                    feat_names=feat_names_scrubbed,
+                    num_replace=num_concept_holdout,
+                    )
                 print('END OF PROMPT\n\n\n\n')
 
                 # ask for candidates
                 raw_candidate_concept_dicts = self.query_for_new_cand(iter_llm_prompt, top_feat_names, max_new_tokens=self.max_new_tokens)
-                print(raw_candidate_concept_dicts)
+                print("raw_candidate_concept_dicts", len(raw_candidate_concept_dicts), raw_candidate_concept_dicts)
                 
                 # extract candidate concepts
-                all_extracted_features = common.extract_features_by_llm(
+                all_extracted_features = common.extract_features_by_llm_grouped(
                     self.llm_extraction,
-                    data_df, 
+                    minibatch_df, 
                     raw_candidate_concept_dicts,
                     all_extracted_features_dict=all_extracted_features,
                     prompt_file=self.prompt_concepts_file,
-                    extraction_file=self.out_extractions_file,
                     batch_size=self.batch_size,
+                    max_new_tokens=8000,
+                    batch_concept_size=self.batch_concept_size,
+                    group_size=self.batch_obs_size,
                     is_image=self.is_image,
                     max_section_length=self.max_section_length,
-                    requests_per_second=self.requests_per_second
+                    extraction_file=self.out_extractions_file,
                 )
+                print("ALL KEYS", all_extracted_features.keys())
 
-                if self.do_greedy or (i < self.num_greedy_epochs):
+                if is_iter_greedy:
                     # do greedy selection of new concept
-                    selected_concept_dict = self._do_greedy_step(
-                        data_df,
+                    selected_concept_dicts = self._do_greedy_step(
+                        minibatch_df,
                         extracted_features, 
-                        y_train,
+                        minibatch_y_train,
                         raw_candidate_concept_dicts,
                         all_extracted_features,
-                        existing_concept_dict=concept_to_replace,
+                        existing_concept_dicts=concepts_to_replace,
                     )
                 else:
                     # Get prior
+                    assert len(concepts_to_replace) == 1
                     prior_llm_prompt = self.make_concept_prior_prompt(
                         raw_candidate_concept_dicts,
-                        concept_to_replace["concept"],
+                        concepts_to_replace[0]["concept"],
                         meta_concepts_text,
                         top_features_text)
-                    print(prior_llm_prompt)
-                    candidate_concept_dicts, backward_llm_prior = common.query_and_parse_llm(
-                        self.llm_iter,
-                        prior_llm_prompt,
-                        extract_func=lambda x: self.extract_concept_prior(x, raw_candidate_concept_dicts),
-                        default_response=(raw_candidate_concept_dicts, self.default_prior))
-                    concept_to_replace["prior"] = backward_llm_prior
-                    print(candidate_concept_dicts)
-                    logging.info("candidate concept dicts %s", candidate_concept_dicts)
+                    prior_response = self.llm_iter.get_output(prior_llm_prompt, max_new_tokens=5000, response_model=PriorResponse)
+                    all_concept_dicts = concepts_to_replace + raw_candidate_concept_dicts
+                    all_concept_dicts = prior_response.fill_candidate_concept_dicts(all_concept_dicts)
+                    logging.info("candidate concept dicts %s", all_concept_dicts[1:])
                     
                     # compute posterior and do gibbs-like sampling
                     selected_concept_dict = self._do_acceptance_rejection_step(
-                        data_df,
+                        minibatch_df,
                         extracted_features, 
-                        y_train,
+                        minibatch_y_train,
                         train_idx,
                         test_idx,
-                        candidate_concept_dicts,
+                        all_concept_dicts[1:],
                         all_extracted_features,
-                        backward_prob=backward_llm_prior,
-                        existing_concept=concept_to_replace,
+                        backward_prob=all_concept_dicts[0]['prior'],
+                        existing_concept=all_concept_dicts[0],
                     )
-                meta_concept_dicts = [selected_concept_dict] + concept_subset_dicts
+                    selected_concept_dicts = [selected_concept_dict]
+                meta_concept_dicts = selected_concept_dicts + concept_subset_dicts
 
                 logging.info("-------------------------")
                 logging.info("posterior sample: %s", [c["concept"] for c in meta_concept_dicts[:self.num_meta_concepts]])
                 for c in meta_concept_dicts[:self.num_meta_concepts]:
                     logging.info("posterior sample iter %d: %s", num_iter, c['concept'])
+
+                logging.info("Time for iteration %d: %d (sec)", j, time.time() - st_time)
                 
-                history.save(training_history_file)
-                history.plot_aucs(aucs_plot_file)
             logging.info("Time for epoch %d (sec)", time.time() - st_time)
     
     @staticmethod
-    def fit_residual(model, word_names, X_extracted, X_words, y_train, penalty_downweight_factor: float, is_multiclass: bool, num_top: int):
+    def fit_residual(model, word_names, X_extracted, X_words, y_train, penalty_downweight_factor: float, is_multiclass: bool, num_top: int, use_acc: bool = False, seed: int = None):
         if X_extracted is None:
             num_fixed = 0
             word_resid_X = X_words
@@ -236,13 +271,14 @@ class ConceptLearnerModel:
             num_fixed = X_extracted.shape[1]
             word_resid_X = np.concatenate([X_extracted * penalty_downweight_factor, X_words], axis=1)
             # word_resid_X = np.concatenate([X_extracted, X_words], axis=1)
-        results = common.train_LR(word_resid_X, y_train, penalty=model)
-        print("COEF", results["coef"].shape)
+        results = common.train_LR(word_resid_X, y_train, penalty=model, use_acc=use_acc, seed=seed)
+        print("MODEL ACC AUC", results["acc"], results["auc"])
         logging.info("residual fit AUC: %f", results["auc"])
+        logging.info("residual fit ACC: %f", results["acc"])
         logging.info("COEFS fixed %s", results["coef"][:,:num_fixed])
-        logging.info("COEFS words %s", np.sort(results["coef"][0, num_fixed:]))
+        logging.info("COEFS words %s", np.sort(results["coef"][:, num_fixed:]))
         word_coefs = results["coef"][:,num_fixed:]
-
+        
         # display only top features from the residual model
         if not is_multiclass:
             df = pd.DataFrame(
@@ -275,23 +311,55 @@ class ConceptLearnerModel:
             y, 
             candidate_concept_dicts, 
             all_extracted_feat_dict, 
-            existing_concept_dict,
+            existing_concept_dicts,
         ):
-        concept_scores = []
-        all_concept_dicts = candidate_concept_dicts + [existing_concept_dict]
-        for concept_dict in all_concept_dicts:
-            extracted_candidate = common.get_features([concept_dict], all_extracted_feat_dict, dataset_df)
-            aug_extract = np.concatenate([extracted_features, extracted_candidate], axis=1)
-            train_res = common.train_LR(aug_extract, y)
-            candidate_score = roc_auc_score(y, train_res["y_pred"], multi_class="ovo")
-            concept_scores.append(candidate_score)
-        max_idxs = np.where(np.isclose(concept_scores, np.max(concept_scores)))[0]
-        max_idx = np.random.choice(max_idxs)
+        all_concept_dicts = existing_concept_dicts + candidate_concept_dicts
         logging.info("concepts (greedy search) %s", [cdict['concept'] for cdict in all_concept_dicts])
-        logging.info("concepts (greedy train) %s", concept_scores)
-        logging.info("selected concept (greedy) %s", all_concept_dicts[max_idx]['concept'])
-        logging.info("greedy-accept %s", max_idx < len(candidate_concept_dicts))
-        return all_concept_dicts[max_idx]
+        num_orig_features = extracted_features.shape[1]
+        selected_concepts = []
+        if self.num_greedy_holdout <= 2:
+            # do step-wise selection if only selecting 2 concepts
+            for i in range(self.num_greedy_holdout):
+                concept_scores = []
+                for concept_dict in all_concept_dicts:
+                    extracted_candidate = common.get_features([concept_dict], all_extracted_feat_dict, dataset_df)
+                    aug_extract = np.concatenate([extracted_features, extracted_candidate], axis=1)
+                    train_res = common.train_LR(aug_extract, y, penalty=self.residual_model_type, use_acc=self.is_greedy_metric_acc)
+                    if self.is_greedy_metric_acc:
+                        # use accuracy
+                        candidate_score = np.mean(y == train_res["y_assigned_class"])
+                    else:
+                        # use AUC
+                        candidate_score = roc_auc_score(y, train_res["y_pred"], multi_class="ovr")
+                    concept_scores.append(candidate_score)
+                max_idxs_options = np.where(np.isclose(concept_scores, np.max(concept_scores)))[0]
+                max_idx = np.random.choice(max_idxs_options)
+                
+                extracted_features = np.concatenate([
+                    extracted_features,
+                    common.get_features([all_concept_dicts[max_idx]], all_extracted_feat_dict, dataset_df)
+                    ], axis=1)
+
+                logging.info("concepts (greedy train) %s", concept_scores)
+                logging.info("selected concept (greedy) %s", all_concept_dicts[max_idx]['concept'])
+                logging.info("greedy-accept %s", max_idx >= len(existing_concept_dicts))
+
+                selected_concepts.append(all_concept_dicts[max_idx])
+                all_concept_dicts.pop(max_idx)
+        else:
+            # use lasso to do selection if selecting multiple concepts
+            extracted_candidates = common.get_features(all_concept_dicts, all_extracted_feat_dict, dataset_df)
+            aug_extract = np.concatenate([extracted_features, extracted_candidates], axis=1)
+            train_res = common.train_LR(aug_extract, y, penalty=self.residual_model_type, use_acc=self.is_greedy_metric_acc)
+            coef_magnitudes = np.max(np.abs(train_res['coef'][:, num_orig_features:]), axis=0)
+            # get the concepts with the largest maximum magnitudes
+            feat_idx_sorted = np.argsort(-coef_magnitudes)
+            max_idxs = feat_idx_sorted[:self.num_greedy_holdout]
+            for max_idx in max_idxs:
+                logging.info("selected concept (greedy) %s", all_concept_dicts[max_idx]['concept'])
+            selected_concepts = [all_concept_dicts[i] for i in max_idxs]
+        
+        return selected_concepts
     
     def _do_acceptance_rejection_step(
             self,
@@ -302,8 +370,8 @@ class ConceptLearnerModel:
             test_idx, 
             candidate_concept_dicts, 
             all_extracted_feat_dict, 
-            backward_prob,
-            existing_concept
+            backward_prob: float,
+            existing_concept: dict
         ):
         """
         Compute the posterior distribution over the candidate concepts
@@ -372,87 +440,6 @@ class ConceptLearnerModel:
         print("MH-accept %d (accept ratio %.4f)", is_accept, acceptance_ratio)
         return new_concept if is_accept else existing_concept
 
-    @staticmethod
-    def get_candidate_concepts(llm_output, keep_num_candidates: int = 6, default_prior: float = 1) -> list[dict]:
-        #Process the LLM candidates to make sure that we have all the info we need
-        #Also shorten the list of candidates if the LLM outputs too many
-        
-        def _clean_prior_dict(d):
-            if not hasattr(d, 'words'):
-                for k in ['synonyms', 'phrases']:
-                    if k in prior_dicts[i]:
-                        d['words'] = d[k]
-
-            return d
-            
-
-        llm_output = llm_output.replace("```json", "").replace("```", "")
-        try:
-            logging.info("candidate concept summary =================")
-            try:
-                try: 
-                    json.loads(llm_output)["concepts"]
-                except:
-                    outs = llm_output.split('\n')
-                    jsons = []
-                    for out in outs:
-                        try:
-                            jsons.append(json.loads(out))
-                        except:
-                            pass           
-
-                # reformat into prior_dicts
-                prior_dicts = []
-                for i in range(len(jsons)):
-                    prior_dicts.append({
-                        'concept': list(jsons[i].keys())[0],
-                        'words': list(jsons[i].values())[0],
-                    })
-                # breakpoint()
-
-
-            except:
-                llm_output = convert_to_json(llm_output)
-                if 'concepts' in llm_output:
-                    prior_dicts = llm_output["concepts"]
-                elif 'candidates' in llm_output:
-                    prior_dicts = llm_output["candidates"]
-                else:
-                    prior_dicts = llm_output
-                if not isinstance(prior_dicts, list):
-                    prior_dicts = convert_to_list_of_jsons(llm_output)
-                    for i in range(len(prior_dicts)):
-                        if not hasattr('words', prior_dicts[i]):
-                            for k in ['synonyms', 'phrases']:
-                                if k in prior_dicts[i]:
-                                    prior_dicts[i] = _clean_prior_dict(prior_dicts[i])
-            # breakpoint()
-            for i in range(len(prior_dicts)):
-                prior_dicts[i] = _clean_prior_dict(prior_dicts[i])
-                concept = prior_dicts[i]['concept']
-                assert len(concept)
-                if not concept.startswith(common.TABULAR_PREFIX):
-                    prior_dicts[i]['words'] = [w.lower().strip() for w in prior_dicts[i]['words'].split(",")]
-                # Fill out each concept with a default prior -- to be overwritten as needed
-                prior_dicts[i]['prior'] = default_prior
-                logging.info("CONCEPT %s %s", prior_dicts[i]['concept'], prior_dicts[i])
-
-            #assert len(prior_dicts) > 0
-        except Exception as e:
-            logging.info("ERROR in extracting candidate concepts %s", e)
-            raise ValueError("bad JSON llm response")
-            breakpoint()
-
-        logging.info("concept prior dict %s", prior_dicts)
-
-        # only keep the first keep_num candidates, because otherwise this inference procedure will take forever
-        top_candidates = prior_dicts[:keep_num_candidates]
-        logging.info("top candidates %s", top_candidates)
-
-        if len(top_candidates) == 0:
-            logging.info("Error candidate concepts are empty")
-        return top_candidates
-
     def _get_prob_concepts_given_D(
             self,
             extracted_features, 
@@ -513,6 +500,11 @@ class ConceptLearnerModel:
 
         return lik, invcov_mat, theta
     
+    def fill_config(self, template_str: str):
+        for k, v in self.config.items():
+            template_str = template_str.replace(k, v)
+        return template_str
+    
     def make_new_concept_prompt(
             self,
             X_extracted,
@@ -520,8 +512,8 @@ class ConceptLearnerModel:
             y,
             data_df,
             extract_feature_names, 
-            concept_to_replace, 
-            feat_names
+            feat_names,
+            num_replace: int = 1, 
         ):
         """
         Generate prompt to ask LLM for candidate concepts
@@ -537,7 +529,8 @@ class ConceptLearnerModel:
             y,
             penalty_downweight_factor=self.penalty_downweight_factor,
             is_multiclass=self.is_multiclass,
-            num_top=self.num_top
+            num_top=self.num_top,
+            use_acc=self.is_greedy_metric_acc,
         )
         
         # normalize the coefficients just to make it a bit easier to read for the LLM
@@ -552,54 +545,30 @@ class ConceptLearnerModel:
         for i, feat_name in enumerate(extract_feature_names):
             meta_concepts_text += f"* X{i} = {feat_name} \n" 
         prompt_template = prompt_template.replace("{meta_concepts}", meta_concepts_text)
-        prompt_template = prompt_template.replace("{meta_to_replace}", concept_to_replace)
-        prompt_template = prompt_template.replace("{num_concepts_fixed}", str(self.num_meta_concepts - 1))
-
+        # prompt_template = prompt_template.replace("{meta_to_replace}", concepts_to_replace)
+        prompt_template = prompt_template.replace("{num_concepts_fixed}", str(self.num_meta_concepts - num_replace))
+        prompt_template = prompt_template.replace("{num_attributes}", str(top_df.shape[0]))
+        
+        prompt_template = self.fill_config(prompt_template)
         return prompt_template, meta_concepts_text, top_features_text, top_df.feature_name
 
     def scrub_vectorized_sentences(self, X_features, feat_names, concept_dicts: list):
         # Remove the words that are too correlated with the concepts from the residual model's inputs
-        words_to_scrub = [w for c in concept_dicts if not common.is_tabular(c['concept']) for w in c['words']]
+        words_to_scrub = [w for c in concept_dicts if not common.is_tabular(c['concept']) for w in c['words'] if len(w) > 2]
         keep_mask = [
             ~np.any([scrub_word in w for scrub_word in words_to_scrub]) or common.is_tabular(w)
             for w in feat_names]
         return X_features[:, keep_mask], feat_names[keep_mask]
     
-    def query_for_new_cand(self, iter_llm_prompt, top_feat_names, times_to_retry=10, max_new_tokens=4000):
-        llm_response = self.llm_iter.get_output(iter_llm_prompt, max_new_tokens=max_new_tokens)
-        while times_to_retry > 0:
-            # breakpoint()
-            print('times_to_retry', times_to_retry)
-            try:
-                # breakpoint()
-                candidate_concept_dicts = self.get_candidate_concepts(llm_response, keep_num_candidates=self.keep_num_candidates, default_prior=self.default_prior)
-                candidate_concept_dicts += [{
-                    "concept": feat_name,
-                    "prior": self.default_prior
-                } for feat_name in top_feat_names if common.is_tabular(feat_name)]
-                return candidate_concept_dicts
-            except Exception:
-                logging.info("llm call failed. Retrying query. here is the response %s", llm_response)
-                # print('\n\nRESPONSE:', llm_response, '\n\n')
-                breakpoint()
-                llm_response = self.llm_iter.get_output(iter_llm_prompt, max_new_tokens=max_new_tokens)
-                # breakpoint()
-                times_to_retry -= 1
+    def query_for_new_cand(self, iter_llm_prompt, top_feat_names, times_to_retry=1, max_new_tokens=5000):
+        llm_response = self.llm_iter.get_output(iter_llm_prompt, max_new_tokens=max_new_tokens, response_model=CandidateConcepts)
+        candidate_concept_dicts = llm_response.to_dicts(default_prior=self.default_prior)
+        candidate_concept_dicts += [{
+            "concept": feat_name,
+            "prior": self.default_prior
+        } for feat_name in top_feat_names if common.is_tabular(feat_name)]
+        return candidate_concept_dicts[:self.max_candidates_to_consider]
 
-    def extract_concept_prior(self, llm_output, concept_dicts, min_prior=1e-3):
-        logging.info("concept prior elicitation =================")
-        llm_output = convert_to_json(llm_output)
-        logging.info("concept prior dict %s", llm_output)
-        backwards_prior_prob = max(float(llm_output["0"]), min_prior)
-        assert len(llm_output) > 1
-        keep_concept_dicts = []
-        for k, v in llm_output.items():
-            if int(k) == 0:
-                continue
-            concept_dicts[int(k) - 1]['prior'] = max(float(v), min_prior)
-            keep_concept_dicts.append(concept_dicts[int(k) - 1])
-        return keep_concept_dicts, backwards_prior_prob
-        
     def make_concept_prior_prompt(self, concept_dicts, concept_to_replace, meta_concepts_text, top_words_text):
         """
         Generate prompt to ask LLM for candidate concepts
@@ -614,15 +583,6 @@ class ConceptLearnerModel:
             candidate_concepts_text += f"{i + 1}. {concept_dict['concept']}\n" 
         prompt_template = prompt_template.replace("{candidate_list}", candidate_concepts_text)
         prompt_template = prompt_template.replace("{top_features_df}", top_words_text)
+        
+        prompt_template = self.fill_config(prompt_template)
         return prompt_template
-
-    def get_overlapping_concepts(self, concepts: list, top_feat_names) -> list:
-        """Return concepts that contain some metnion of the top feature names
-        """
-        candidate_concepts = []
-        for feat_name in top_feat_names:
-            for c in concepts:
-                if (feat_name in c) and (c not in candidate_concepts):
-                    candidate_concepts.append(c)
-                    break
-        return list(candidate_concepts)

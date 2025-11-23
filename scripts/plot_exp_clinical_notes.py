@@ -101,7 +101,7 @@ def main():
         all_concepts_df.append(concepts_df)
         all_concept_sizes.append((100 * posterior_probs)**2)
     
-    plt.figure(figsize=(10,6))
+    plt.figure(figsize=(10,4))
     for plot_idx in range(len(all_concepts_df)):
         idx = plot_idx
         concepts_df = all_concepts_df[idx].T
@@ -114,8 +114,8 @@ def main():
             leaf_rotation=0,
             color_threshold=0 if plot_idx == 0 else 0.58,
             orientation='right')
+    plt.subplots_adjust(left=0.8, right=0.95) 
     # plt.tight_layout()
-    plt.subplots_adjust(left=0.5, right=0.9) 
     plt.savefig(args.plot_hierarchical_file)
 
 if __name__ == "__main__":

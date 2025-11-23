@@ -42,8 +42,7 @@ class ImageDataset(Dataset):
     def __init__(self, df):
         self.df = df
         self.transform = transforms.Compose([
-            transforms.RandomResizedCrop(RESNET_IMAGE_SIZE),
-            transforms.RandomHorizontalFlip(),
+            transforms.Resize((224,224)),
             transforms.ToTensor(),
             transforms.Normalize(IMAGE_NET_MEAN, IMAGE_NET_STD)
         ])
@@ -92,12 +91,15 @@ def main(args):
 
     X_train, y_train = get_data(args.image_weights, device, dataloader)
 
-    model = LogisticRegressionCV(max_iter=10000, penalty="l2",Cs=20, solver="saga", multi_class="multinomial")
+    model = LogisticRegressionCV(max_iter=10000, penalty="l2",Cs=20, solver="saga", multi_class="multinomial", n_jobs=3, cv=3)
     model.fit(X_train, y_train)
 
     pred_prob = model.predict_proba(X_train)
 
-    auc = roc_auc_score(y_score=pred_prob, y_true=y_train, multi_class="ovr")
+    if np.unique(y_train).size == 2:
+        auc = roc_auc_score(y_score=pred_prob[:,1], y_true=y_train, multi_class="ovr")
+    else:
+        auc = roc_auc_score(y_score=pred_prob, y_true=y_train, multi_class="ovr")
 
     print(f"Res net train AUC {auc}")
     logging.info("Res net train AUC %f", auc)

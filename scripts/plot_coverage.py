@@ -74,12 +74,14 @@ def main():
     args = parse_args()
     np.random.seed(args.seed)
 
-    with open(args.oracle_extraction_file, "rb") as f:
+    # HACK: ablation replace-str is just a hack so i dont have to run all commands in the scons
+    with open(args.oracle_extraction_file.replace("ablation/",""), "rb") as f:
         oracle_extracted_feature_dict = pickle.load(f)
     with open(args.model_extraction_file, "rb") as f:
         model_extracted_feature_dict = pickle.load(f)
 
-    oracle_history = TrainingHistory().load(args.oracle_history_file)
+    # HACK: ablation replace-str is just a hack so i dont have to run all commands in the scons
+    oracle_history = TrainingHistory().load(args.oracle_history_file.replace("ablation/",""))
     history = TrainingHistory().load(args.model_history_file)
     
     oracle_concepts = oracle_history.get_last_concepts()

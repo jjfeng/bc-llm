@@ -48,7 +48,7 @@ def parse_args():
         default="_output/hier.png"
     )
     parser.add_argument(
-        "--concepts-csv-file",
+        "--log-file",
         type=str,
     )
     args = parser.parse_args()
@@ -74,6 +74,7 @@ def dist_func(x, y):
 
 def main():
     args = parse_args()
+    logging.basicConfig(format="%(message)s", filename=args.log_file, level=logging.INFO)
     np.random.seed(args.seed)
 
     all_extracted_features = {}

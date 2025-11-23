@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import torch
+import logging
 import pickle
 import numpy as np
 import torch
@@ -21,6 +22,7 @@ def parse_args(args):
     parser.add_argument("--in-dataset-file", type=str, help="csv of the labelled training data")
     parser.add_argument("--indices-csv", type=str, help="csv of training indices")
     parser.add_argument("--in-mdl", type=str, help="the learned concept model")
+    parser.add_argument("--log-file", type=str, default="_output/log.txt")
     parser.add_argument("--results-csv", type=str, default="_output/log_results.csv")
     parser.add_argument(
             "--image-weights",
@@ -33,6 +35,9 @@ def parse_args(args):
 
 def main(args):
     args = parse_args(args)
+    logging.basicConfig(format="%(message)s", filename=args.log_file, level=logging.INFO)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     data_df = load_data_partition(args, init_concepts_file=None, text_summary_column=None)
@@ -41,8 +46,8 @@ def main(args):
     dataset = ImageDataset(data_df)
     dataloader = DataLoader(
             dataset, 
-            batch_size=len(dataset),
-            shuffle=True, 
+            batch_size=data_df.shape[0],
+            shuffle=False, 
             num_workers=torch.cuda.device_count()
             )
 

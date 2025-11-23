@@ -18,7 +18,6 @@ sys.path.append(os.getcwd())
 from scripts.train_concept import make_dataset, setup
 from scripts.train_lasso import prep_lasso_data
 from src.common import load_model
-from src.llm.constants import *
 
 def parse_args(args):
     """parse command line arguments"""
@@ -32,11 +31,12 @@ def parse_args(args):
     parser.add_argument("--log-file", type=str, default="_output/log_plot.txt")
     parser.add_argument("--plot-file", type=str, default="_output/test_scatter.png")
     parser.add_argument("--bootstrap-params", type=str, help="file that stores the values for the bootstrapped parameters for the concept model")
+    # currently the code works with llama models
     parser.add_argument(
             "--llm-model-type",
             type=str,
             default="meta-llama/Meta-Llama-3-8B-Instruct",
-            choices=OPENAI_MODELS + BEDROCK_MODELS + VERSA_MODELS
+            choices=["meta-llama/Meta-Llama-3-8B-Instruct"]
             )
     args = parser.parse_args()
     return args

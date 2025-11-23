@@ -30,6 +30,11 @@ def parse_args():
         type=str,
     )
     parser.add_argument(
+        "--index-col",
+        type=int,
+        default=None,
+    )
+    parser.add_argument(
         "--csv-file",
         type=str,
         default="_output/res.csv",
@@ -46,7 +51,7 @@ def main():
     all_res = []
     for res_file in args.result_files:
         try:
-            res = pd.read_csv(res_file, index_col=0)
+            res = pd.read_csv(res_file, index_col=args.index_col)
             all_res.append(res)
         except FileNotFoundError as e:
             print(e)
@@ -58,8 +63,8 @@ def main():
     all_res.to_csv(args.csv_file, index=False)
     print(all_res)
 
-    # if args.groupby_cols is not None:
-    #     print(all_res.groupby(args.groupby_cols).mean())
+    if args.groupby_cols is not None:
+        print(all_res.groupby(args.groupby_cols).mean(numeric_only=True))
 
 
 if __name__ == "__main__":

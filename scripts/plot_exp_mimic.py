@@ -9,6 +9,39 @@ import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
 
+DEFAULT_HUE_ORDER = [
+            'BC-LLM',
+            'LLM+CBM',
+            'Boosting LLM+CBM',
+            'Human(Oracle)+CBM',
+            'Bag-of-words'
+        ]
+ABLATION_COHERE_HUE_ORDER = [
+            'BC-LLM Ablation',
+            'BC-LLM Cohere',
+            'LLM+CBM Cohere',
+            'Boosting LLM+CBM Cohere',
+            'Human(Oracle)+CBM Cohere',
+            'Bag-of-words Cohere'
+        ]
+DEFAULT_MAP = {
+        'baseline': 'LLM+CBM',
+        'bayesian': 'BC-LLM',
+        'boosting': 'Boosting LLM+CBM',
+        'oracle': 'Human(Oracle)+CBM',
+        'Bag of Words': 'Bag-of-words',
+    }
+COHERE_MAP = {
+        'baseline': 'LLM+CBM Cohere',
+        'bayesian': 'BC-LLM Cohere',
+        'boosting': 'Boosting LLM+CBM Cohere',
+        'oracle': 'Human(Oracle)+CBM Cohere',
+        'Bag of Words': 'Bag-of-words Cohere',
+    }
+ABLATION_MAP = {
+        'bayesian': 'BC-LLM Ablation',
+    }
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="plot for exp_mimic"
@@ -20,11 +53,18 @@ def parse_args():
     )
     parser.add_argument(
         "--in-result-csv",
+        nargs="+",
         type=str,
     )
     parser.add_argument(
         "--coverage-csv",
+        nargs="+",
         type=str,
+    )
+    parser.add_argument(
+        '--maps',
+        nargs="+",
+        type=str
     )
     parser.add_argument(
         "--plot-file",
@@ -47,35 +87,56 @@ def main():
     
     sns.set_context('paper', font_scale=2.5)
 
-    res = pd.read_csv(args.in_result_csv)[['auc', 'log_lik', 'seed', 'method', 'max_train_obs']]
-    print(res.groupby(["method", "max_train_obs"]).mean())
-    res = res.melt(id_vars=["method", "seed", "max_train_obs"], var_name="metric")
-    coverage_df = pd.read_csv(args.coverage_csv)
+    map_list = []
+    for map_str in args.maps:
+        print(map_str)
+        if map_str == "ablation":
+            map_list.append(ABLATION_MAP)
+        elif map_str == "cohere":
+            map_list.append(COHERE_MAP)
+        else:
+            map_list.append(DEFAULT_MAP)
+
+    all_res = []
+    for csv_f, map_dict in zip(args.in_result_csv, map_list):
+        res = pd.read_csv(csv_f)[['auc', 'brier', 'seed', 'method', 'max_train_obs']]
+        print(res.method.unique())
+        res['method'] = res['method'].map(map_dict)
+        all_res.append(res)
+    all_res = pd.concat(all_res).reset_index(drop=True)
+    all_res = all_res.melt(id_vars=["method", "seed", "max_train_obs"], var_name="metric")
+    all_res = all_res[all_res.metric.isin(['auc', 'log_lik', 'brier'])]
+    
+    all_coverages = []
+    for csv_f, map_dict in zip(args.coverage_csv, map_list):
+        cov_df = pd.read_csv(csv_f)
+        cov_df['method'] = cov_df['method'].map(map_dict)
+        print(cov_df)
+        all_coverages.append(cov_df)
+    coverage_df = pd.concat(all_coverages).reset_index(drop=True)
     coverage_df = coverage_df[coverage_df.metric.isin(['recall', 'precision'])]
     coverage_df['value'] = coverage_df.abs_corr > args.coverage_threshold
-    res = pd.concat([res, coverage_df])
-    res['metric'] = res['metric'].map({
+    print(coverage_df)
+    print(coverage_df[['metric', 'method', 'max_train_obs', 'value']].groupby(['method', 'metric', 'max_train_obs',]).mean())
+    
+    all_res = pd.concat([all_res, coverage_df])
+    all_res['metric'] = all_res['metric'].map({
         'auc': 'AUC',
         'log_lik': 'Log Likelihood',
+        'brier': 'Brier',
         'recall': 'Recall',
         'precision': 'Precision'
     })
-    res['method'] = res['method'].map({
-        'baseline': 'One-pass',
-        'bayesian': 'BC-LLM',
-        'boosting': 'Boosting',
-        'oracle': 'Pre-specified',
-        'Bag of Words': 'Bag-of-words',
-    })
-    res = res.rename({
+    
+    all_res = all_res.rename({
         'method': 'Method',
         'max_train_obs': 'Num train obs',
         'value': 'Value',
         'metric': 'Metric',
     }, axis=1)
-
+    print(all_res)
     g = sns.relplot(
-        data=res,
+        data=all_res,
         x="Num train obs",
         y="Value",
         hue="Method",
@@ -83,17 +144,10 @@ def main():
         kind="line",
         facet_kws={"sharey": False, "sharex": True},
         palette=palette,
-        # col_wrap=2,
-        hue_order=[
-            'BC-LLM',
-            'One-pass',
-            'Boosting',
-            'Pre-specified',
-            'Bag-of-words'
-        ]
+        col_wrap=4,
+        hue_order=DEFAULT_HUE_ORDER, # ABLATION_COHERE_HUE_ORDER
     )
     g.set_titles("{col_name}")
-    g.axes.flat[1].set_ylim((-1.15, -0.5))
     plt.savefig(args.plot_file)
 
     # plt.clf()
