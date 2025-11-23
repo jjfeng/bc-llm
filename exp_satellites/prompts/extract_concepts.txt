@@ -1,0 +1,19 @@
+Given a set of images, our task is to brainstorm a set of descriptors that will help classify the image to its corresponding label Y. For the provided image, list as many descriptors about it. For each descriptor, also list as many descriptors that mean the same thing or generalizations of the descriptor. All descriptors, synonyms, and generalizations cannot be more than two words. Output characteristics that this image possess, such as "forest" or "long road." Output at least 10 keyphrases.
+
+Output in the following format:
+{
+    "keyphrases": [
+        "<STRING_OF_DESCRIPTOR1_AND_SYNONYMS_AND_GENERALIZATIONS>",
+        "<STRING_OF_DESCRIPTOR2_AND_SYNONYMS_AND_GENERALIZATIONS>",
+        ...
+    ]
+}
+
+Example:
+{
+    "keyphrases": [
+        "forest, trees",
+        "long road, road",
+        ...
+    ]
+}
