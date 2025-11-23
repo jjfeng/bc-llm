@@ -1,7 +1,7 @@
-The goal is to come up with a concept bottleneck model that only extracts {num_concepts} meta-concepts to describe attributes in an image to predict some outcome Y with maximum accuracy. A meta-concept is a binary feature extractor defined by a yes/no question. We have {num_concepts_fixed} meta-concepts so far:
+We are fitting a concept bottleneck model for classifying the species of a bird based on the attributes of the bird in its image. The possible bird classes are: [[CLASS_OPTIONS]]. The goal is to come up with {num_meta_concepts} meta-concepts to extract from the images to maximize the accuracy of the concept bottleneck model. A meta-concept is a binary feature extractor defined by a yes/no question. We have {num_concepts_fixed} meta-concepts so far:
 {meta_concepts}
 
-We are planning to add one of the following candidate meta-concepts to the concept bottleneck model to predict Y:
+We are planning to add one of the following candidate meta-concepts to the concept bottleneck model:
 {candidate_list}
 
 Assign a prior probability for each of the candidate meta-concepts. To help come up with a prior probability, we have used an LLM to summarize each image and fit a bag-of-words model on the summaries to predict the residuals. These are the top features in the residual model, in descending order of importance:

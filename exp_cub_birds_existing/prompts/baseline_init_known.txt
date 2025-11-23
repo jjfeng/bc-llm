@@ -1,0 +1,25 @@
+We are fitting a concept bottleneck model for classifying the species of a bird based on the attributes of the bird in its image. The possible bird classes are: [[CLASS_OPTIONS]]. The goal is to come up with {num_meta_concepts} meta-concepts to extract from the images to maximize the accuracy of the concept bottleneck model.
+
+We fit a simple logistic regression model given attributes extracted from the bird images. Based on the attributes most associated with the bird classes, come up with {num_meta_concepts} meta-concepts. A meta-concept has to be defined in terms of a yes/no question, e.g. Does the bird in the image have blue feathers? You can also propose meta-concepts that only correspond to a single word. Pick meta-concepts that are as specific as possible, without being too broad. Meta-concepts should be questions about the attributes in an image.
+
+Words with top coefficients (absolute value):
+
+{top_features_df}
+
+Output {num_meta_concepts} concepts in the following JSON format:
+{
+    "reasoning": "<DISCUSS REASONING FOR WHICH CONCEPTS TO INCLUDE>",
+    "concepts": [
+        {"concept": "<CANDIDATE META CONCEPT>", "words": <COMMA-SEPARATED WORDS THAT ARE CLOSE SYNONYMS OR ANTONYMS OF THIS CONCEPT>},
+        ...
+    ]
+}
+Here is an example:
+{
+    "reasoning": "There are many keyphrases that are related to each other so I will group some together.",
+    "concepts": [
+        {"concept": "Does the bird in the image have blue feathers?", "words": "blue feathers, blue plumage"},
+        {"concept": "Does the bird in the image have a curved beak?", "words": "curved beak"},
+        ...
+    ]
+}

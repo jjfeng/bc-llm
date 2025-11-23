@@ -4,9 +4,21 @@ You will be given a clinical note. I will give you a series of questions. Your t
 clinical note:
 {sentence}
 
-Example answer: {
-    "0": 0,
-    "1": 1,
-    "2": 0.5
+Example answer: 
+{
+    "extractions":
+    [
+        {
+            "question_id": 1,
+            "reasoning": <PROVIDE STRING WITH REASONING>,
+            "answer": 0
+        },
+        {
+            "question_id": 2,
+            "reasoning": <PROVIDE STRING WITH REASONING>,
+            "answer": 0.5
+        }
+        ...
+    ]
 }
-Answer all the questions and do not answer with anything else besides valid JSON.  Each key in the JSON should be an integer for the corresponding concept and each value should be a valid float. Do not add comments to the JSON and ensure your JSON is valid.
+Answer all the questions and do not answer with anything else besides valid JSON. Do not add comments to the JSON.

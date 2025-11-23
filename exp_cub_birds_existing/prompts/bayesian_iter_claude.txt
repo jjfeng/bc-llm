@@ -19,7 +19,7 @@ Output at least 6 candidate concepts in the following JSON format:
 }
 Here are example concept dictionaries:
 [
-    {"concept": "Does the bird in the image have blue feathers?", "words": "blue feathers, blue plumage"},
-    {"concept": "Does the bird in the image have a curved beak?", "words": "curved beak"},
+    {"concept": "Does the image depict blue feathers?", "words": "blue feathers, blue plumage"},
+    {"concept": "Does the image depict a fur?", "words": "fur, furry"},
     ...
 ]

@@ -1,0 +1,35 @@
+I will give you a series of questions about the bird in the image. Your task is answer each question with a probability from 0 to 1, which will help us distinguish the type of bird in the image. If the question asks about a bird feature that is obscured (e.g. "does the image depict a bird with black feet?"), reason about the bird you see and then provide your best guess (you may also use a probability if you are unsure). Summarize the response with a JSON that includes your answer to all of the questions, whenever the answer is nonzero (i.e. the answers should be provided in a format). Questions:
+{prompt_questions}
+
+Output your answer in the following format:
+{
+    "reasoning": "<DISCUSS REASONING HERE>",
+    "extractions": [
+        {
+            "question": "<QUESTION_NUMBER>",
+            "reasoning": "<REASONING>",
+            "answer": <EXTRACTED VALUE FROM 0 to 1>,
+        },
+        ...
+    ]  
+}
+Example:
+{
+    "reasoning": "The bird has attributes listed in question 1. The bird's feet are obscured, so I will output a probability for question 2.",
+    "extractions":
+    [
+        {
+            "question": 1,
+            "reasoning": "This bird has this attribute.",
+            "answer": 1
+        },
+        {
+            "question": 2,
+            "reasoning": "The feet are obscured so there is a small chance this bird is... So I will fill in 0.1.",
+            "answer": 0.1
+        },
+        ...
+    ]
+}
+
+Answer all the questions in order, and do not answer with anything else besides valid JSON. Your answer:

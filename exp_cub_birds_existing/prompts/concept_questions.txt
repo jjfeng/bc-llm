@@ -1,9 +1,35 @@
 You will be given an image. I will give you a series of questions. Your task is answer each question with a probability from 0 to 1. Summarize the response with a JSON that includes your answer to all of the questions. Questions:
 {prompt_questions}
 
-Example answer: {
-    "0": 0,
-    "1": 1,
-    "2": 0.5
+Output your answer in the following format:
+{
+    "reasoning": "<DISCUSS REASONING HERE>",
+    "extractions": [
+        {
+            "question": "<QUESTION_NUMBER>",
+            "reasoning": "<REASONING>",
+            "answer": <EXTRACTED VALUE FROM 0 to 1>,
+        },
+        ...
+    ]  
 }
-Answer all the questions and do not answer with anything else besides valid JSON. Your answer:
+Example:
+{
+    "reasoning": "The image has attributes listed in question 1. The attribute listed in question 2 is obscured, so I will output a probability.",
+    "extractions":
+    [
+        {
+            "question": 1,
+            "reasoning": "This image has this attribute.",
+            "answer": 1
+        },
+        {
+            "question": 2,
+            "reasoning": "The attribute in the image is obscured but there is a small probability that it is present. I will fill in 0.1.",
+            "answer": 0.1
+        },
+        ...
+    ]
+}
+
+Answer all the questions in order, and do not answer with anything else besides valid JSON. Your answer:

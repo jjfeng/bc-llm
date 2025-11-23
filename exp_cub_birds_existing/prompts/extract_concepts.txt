@@ -1,13 +1,19 @@
-Output a list of descriptors that describe the image. For each descriptor, also list as many descriptors that mean the same thing or generalizations of the descriptor. All descriptors, synonyms, and generalizations cannot be more than two words. Output in the following format:
+Given a set of images, our task is to brainstorm a set of descriptors that will help classify the image to its corresponding label Y. For the provided image, list as many descriptors about it. For each descriptor, also list as many descriptors that mean the same thing or generalizations of the descriptor. All descriptors, synonyms, and generalizations cannot be more than two words. Output characteristics that this image possess, such as "round wings" or "red head." Do not output general categories of descriptors like "wing color" or "head shape." Output at least 10 keyphrases.
+
+Output in the following format:
 {
-"1": "<STRING_OF_DESCRIPTOR1_AND_SYNONYMS_AND_GENERALIZATIONS>",
-"2": "<STRING_OF_DESCRIPTOR2_AND_SYNONYMS_AND_GENERALIZATIONS>",
-...
+    "keyphrases": [
+        "<STRING_OF_DESCRIPTOR1_AND_SYNONYMS_AND_GENERALIZATIONS>",
+        "<STRING_OF_DESCRIPTOR2_AND_SYNONYMS_AND_GENERALIZATIONS>",
+        ...
+    ]
 }
 
 Example:
 {
-    "1": "round wings",
-    "2": "cardinal head, red head",
-    ...
+    "keyphrases": [
+        "round wings",
+        "cardinal head, red head",
+        ...
+    ]
 }

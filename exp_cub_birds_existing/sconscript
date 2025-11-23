@@ -14,19 +14,14 @@ localenv = env.Clone()
 # Set up state
 nest = SConsWrap(Nest(), localenv['output'], alias_environment=localenv)
 
-# NOTE: The LLM Api only supports images for OpenAI models
-
 NUM_ITERS = 100
 DATA_FOLDER = 'exp_cub_birds_existing/data/CUB_200_2011'
-BATCH_SIZE = 40
 NUM_BIRDS_PER_CLASS = 60
 NUM_NEW_TOKENS = 300
 MIN_NUM_CONCEPTS = 4
 MAX_NUM_CONCEPTS = 10
 MAX_TRAIN_FRACS = [
-    # 0.15,
     # 0.33,
-    # 0.66,
     1
 ]
 
@@ -35,62 +30,92 @@ NUM_EPOCHS = 5
 NUM_RESTRICTED_EPOCHS = 0
 MAX_ITERS = 25
 NUM_BOOST_ITERS = 10
+LABELFREE_BATCH_CONCEPT_SIZE = 30
 
-BAYESIAN_PRIOR_PROMPT = 'exp_cub_birds_existing/prompts/bayesian_prior.txt'
-BAYESIAN_ITER_PROMPT = 'exp_cub_birds_existing/prompts/bayesian_iter.txt'
-EXTRACT_LLM_PROMPT = 'exp_cub_birds_existing/prompts/extract_concepts.txt'
-BASELINE_PROMPT = 'exp_cub_birds_existing/prompts/baseline_init.txt'
-CONCEPTS_PROMPT = 'exp_cub_birds_existing/prompts/concept_questions.txt'
-BOOSTING_PROMPT = 'exp_cub_birds_existing/prompts/boosting_iter.txt'
+GPT4_O_MINI = 'gpt-4o-mini'
+CLAUDE = "claude-3-5-haiku-20241022"
+LLM_MODELS = [
+    # CLAUDE,
+    GPT4_O_MINI
+]
+# TODO: get rid of this hacky bit in the future
+LLM = LLM_MODELS[0]
+
+BATCH_SIZE_DICT = {
+    CLAUDE: 20,
+    GPT4_O_MINI: 40,
+}
+
+COMPARATOR_PROMPT = 'exp_cub_birds_existing/prompts/comparator_label_free_prompt.txt'
+BAYESIAN_PRIOR_PROMPT_DICT = {
+    0: 'exp_cub_birds_existing/prompts/bayesian_prior.txt',
+    1: 'exp_cub_birds_existing/prompts/bayesian_prior_known.txt'
+}
+BAYESIAN_ITER_PROMPT_DICT = {
+    0: {
+        GPT4_O_MINI: 'exp_cub_birds_existing/prompts/bayesian_iter.txt',
+        CLAUDE: 'exp_cub_birds_existing/prompts/bayesian_iter_claude.txt',
+    },
+    1: 'exp_cub_birds_existing/prompts/bayesian_iter_known.txt'
+}
+EXTRACT_LLM_PROMPT_DICT = {
+    0:'exp_cub_birds_existing/prompts/extract_concepts.txt',
+    1:'exp_cub_birds_existing/prompts/extract_concepts_known.txt',
+}
+BASELINE_PROMPT_DICT = {
+    0: 'exp_cub_birds_existing/prompts/baseline_init.txt',
+    1: 'exp_cub_birds_existing/prompts/baseline_init_known.txt',
+}
+CONCEPTS_PROMPT_DICT = {
+    0: 'exp_cub_birds_existing/prompts/concept_questions.txt',
+    1: 'exp_cub_birds_existing/prompts/concept_questions_known.txt',
+}
+BOOSTING_PROMPT_DICT = {
+    0: 'exp_cub_birds_existing/prompts/boosting_iter.txt',
+    # 1: 'exp_cub_birds_existing/prompts/boosting_iter_known.txt',
+}
 
 MAX_TRAIN_OBS = 2000
 NUM_TEST_OBS = 500
 
-LLM_MODELS = [
-    # "meta-llama/Meta-Llama-3.1-70B-Instruct"
-    'gpt-4o-mini'
-]
-LLM_DICT = {
-    'gpt-4o-mini': True, # true using API
-    'meta-llama/Meta-Llama-3.1-70B-Instruct': False, # False, not using API
-}
-
 nest.add_aggregate('res_agg_birds', list)
+nest.add_aggregate('agg_ood', list)
+nest.add_aggregate('agg_pocky', list)
 nest.add('task', [
-    'class_1_2_3',  # Albatross -- DONE
-    'class_5_6_7_8',  # Auklet -- DONE
-    'class_9_10_11_12',  # Blackbird -- DONE
-    'class_14_15_16',  # Bunting -- DONE
-    # 'class_18_19',  # Catbird
-    # 'class_23_24_25',  # Cormorant
-    # 'class_26_27',  # Cowbird
-    # 'class_29_30',  # Crow
-    # 'class_31_32_33',  # Cuckoo
-    # 'class_34_35',  # Finch
-    'class_37_38_39_40_41_42_43',  # Flycatcher -- DONE (actually only 0.75 not 0.5 train bayesian)
-    # 'class_47_48',  # Goldfinch
-    # 'class_50_51_52_53',  # Grebe
-    # 'class_54_55_56_57',  # Grosbeak
-    # 'class_59_60_61_62_63_64_65_66',  # Gull
-    # 'class_67_68_69',  # Hummingbird
-    # 'class_71_72',  # Jaeger
-    # 'class_73_74_75',  # Jay
-    # 'class_77_78',  # Kingbird
-    # 'class_79_80_81_82_83',  # Kingfisher
-    # 'class_95_96_97_98',  # Oriole
-    # 'class_107_108',  # Raven
-    # 'class_111_112',  # Shrike
-    'class_113_114_115_116_117_118_119_120_121_122_123_124_125_126_127_128_129_130_131_132_133',  # Sparrow -- DONE
-    # 'class_135_136_137_138',  # Swallow
-    # 'class_139_140',  # Tanager
-    'class_141_142_143_144_145_146_147',  # Tern -- DONE
-    # 'class_149_150',  # Thrasher
-    # 'class_151_152_153_154_155_156_157',  # Vireo
-    # 'class_158_159_160_161_162_163_164_165_166_167_168_169_170_171_172_173_174_175_176_177_178_179_180_181_182',  # Warbler
-    # 'class_183_184',  # Waterthrush
-    # 'class_185_186',  # Waxwing
-    # 'class_187_188_189_190_191_192',  # Woodpecker
-    # 'class_193_194_195_196_197_198_199'  # Wren
+    'class_1_2_3',  # Albatross
+    'class_5_6_7_8',  # Auklet
+    'class_9_10_11_12',  # Blackbird
+    'class_14_15_16',  # Bunting
+    'class_18_19',  # Catbird
+    'class_23_24_25',  # Cormorant
+    'class_26_27',  # Cowbird
+    'class_29_30',  # Crow
+    'class_31_32_33',  # Cuckoo
+    'class_34_35',  # Finch -- DONE with claude up to now -- STOPPED BY ME -- evaluation done
+    'class_37_38_39_40_41_42_43',  # Flycatcher
+    'class_47_48',  # Goldfinch
+    'class_50_51_52_53',  # Grebe
+    'class_54_55_56_57',  # Grosbeak
+    'class_59_60_61_62_63_64_65_66',  # Gull
+    'class_67_68_69',  # Hummingbird
+    'class_71_72',  # Jaeger
+    'class_73_74_75',  # Jay -- up to this point, DONE for OOD
+    'class_77_78',  # Kingbird
+    'class_79_80_81_82_83',  # Kingfisher
+    'class_95_96_97_98',  # Oriole
+    'class_107_108',  # Raven -- STOPPED BY ME -- evaluation done
+    'class_111_112',  # Shrike
+    'class_113_114_115_116_117_118_119_120_121_122_123_124_125_126_127_128_129_130_131_132_133',  # Sparrow  -- DONE and errored out
+    'class_135_136_137_138',  # Swallow
+    'class_139_140',  # Tanager
+    'class_141_142_143_144_145_146_147',  # Tern
+    'class_149_150',  # Thrasher
+    'class_151_152_153_154_155_156_157',  # Vireo
+    'class_158_159_160_161_162_163_164_165_166_167_168_169_170_171_172_173_174_175_176_177_178_179_180_181_182',  # Warbler -- DIED
+    'class_183_184',  # Waterthrush
+    'class_185_186',  # Waxwing
+    'class_187_188_189_190_191_192',  # Woodpecker -- DIED
+    'class_193_194_195_196_197_198_199'  # Wren -- DIED
 ])
 
 nest.add_aggregate('res_agg_final', list)
@@ -109,7 +134,7 @@ def assemble_cub(env, outdir, c):
     ]
 
     targets = [
-        path_join(outdir, 'labels.csv')
+        path_join(outdir, 'labels_attrs.csv')
     ]
 
     return env.Command(
@@ -118,44 +143,55 @@ def assemble_cub(env, outdir, c):
         ' '.join(map(str, cmd))
     )
 
+nest.add('known', [
+    0,
+    # 1
+], label_func=lambda c: f'known_%d' % c)
 nest.add('llm_model', LLM_MODELS)
 nest.add_aggregate('llm_extractions_agg', dict)
 
 @nest.add_target_with_env(localenv)
 def extract_llm_output(env, outdir, c):
+    assert c["known"] == 0
+
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
     targets = [
         path_join(outdir, 'log_extract.txt'),
         path_join(outdir, 'concept_extractions.csv'),
     ]
     c['llm_extractions_agg'][c['task']] = targets[1]
-    if os.path.exists(targets[1]):
-        return
-    else:
-        cmd = [
-            'python scripts/extract_llm_concepts.py',
-            f'--seed',
-            0,
-            '--is-image',
-            '--num-new-tokens',
-            NUM_NEW_TOKENS,
-            '--in-dataset-file ${SOURCES[0]}',
-            '--prompt-file', EXTRACT_LLM_PROMPT,
-            '--log-file ${TARGETS[0]}',
-            '--llm-output ${TARGETS[1]}',
-            '--llm-model-type',
-            c['llm_model'],
-            '--use-api' if LLM_DICT[c['llm_model']] else '',
-        ]
+    cmd = [
+        'python scripts/extract_llm_concepts.py',
+        '--cache',
+        cache_file,
+        f'--seed',
+        0,
+        '--is-image',
+        '--num-new-tokens',
+        NUM_NEW_TOKENS,
+        '--in-dataset-file ${SOURCES[0]}',
+        '--batch-size',
+        BATCH_SIZE_DICT[c["llm_model"]],
+        '--prompt-file',
+        EXTRACT_LLM_PROMPT_DICT[c["known"]],
+        '--log-file ${TARGETS[0]}',
+        '--llm-output ${TARGETS[1]}',
+        '--llm-model-type',
+        c['llm_model'],
+        '--use-api',
+    ]
+    if c['known']:
+        cmd += ['--config-file', path_join('exp_cub_birds_existing/prompts', f"{c['task']}.json")]
 
-        sources = [
-            c['assemble_cub'][0],
-        ]
+    sources = [
+        c['assemble_cub'][0],
+    ]
 
-        return env.Command(
-            targets,
-            sources,
-            ' '.join(map(str, cmd))
-        )
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
 
 nest.add('seed', [
         0
@@ -207,78 +243,173 @@ nest.add(
 )
 nest.add_aggregate('result_agg', list)
 nest.add_aggregate('train_baseline_history', str)
-nest.add_aggregate('train_boosting_history', str)
+
+@nest.add_target_with_env(localenv)
+def evaluate_comparator(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    # evaluating label-free CBMs
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
+    cmd = [
+        'python scripts/evaluate_comparator.py',
+        f'--seed',
+        c['seed'] + 5,
+        '--batch-obs-size',
+        4,
+        '--batch-size',
+        BATCH_SIZE_DICT[c["llm_model"]],
+        '--batch-concept-size',
+        LABELFREE_BATCH_CONCEPT_SIZE,
+        "--cache",
+        cache_file,
+        '--in-dataset-file ${SOURCES[0]}',
+        '--indices-csv ${SOURCES[1]}',
+        '--log-file ${TARGETS[0]}',
+        '--llm-model-type',
+        c['llm_model'],
+        '--prompt-concepts-file', COMPARATOR_PROMPT,
+        '--result-csv ${TARGETS[1]}',
+        '--out-mdl ${TARGETS[2]}',
+    ]
+
+    sources = [
+        c['assemble_cub'][0],
+        c['train_test_split'][0],
+    ]
+    targets = [
+        path_join(outdir, 'comparator_test_log.txt'),
+        path_join(outdir, 'comparator_result_ece.csv'),
+        path_join(outdir, 'comparator_mdl.pkl'),
+    ]
+    c['result_agg'].append(targets[1])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+@nest.add_target_with_env(localenv)
+def evaluate_pocky_comparator(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
+    trained_class_str = c['task'][6:].replace("_", " ")
+    cmd = [
+        'python scripts/evaluate_pocky.py',
+        "--method",
+        "Labelfree",
+        f'--seed',
+        c['seed'] + 5,
+        '--num-posterior-iters',
+        1,
+        '--batch-size',
+        BATCH_SIZE_DICT[c["llm_model"]],
+        '--batch-concept-size',
+        LABELFREE_BATCH_CONCEPT_SIZE,
+        "--group-size",
+        4,
+        "--cache",
+        cache_file,
+        "--trained-class",
+        trained_class_str,
+        '--training-history-file ${SOURCES[0]}',
+        '--log-file ${TARGETS[0]}',
+        '--csv-file ${TARGETS[1]}',
+        '--prompt-concepts-file', COMPARATOR_PROMPT,
+        '--llm-model-type',
+        c['llm_model'],
+        '--use-api',
+        '--is-image',
+    ]
+
+    sources = c['evaluate_comparator'][2:]
+    targets = [
+        path_join(outdir, 'log_pocky_comparator.txt'),
+        path_join(outdir, 'pocky_comparator.csv'),
+    ]
+    c["agg_pocky"].append(targets[1])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+
+@nest.add_target_with_env(localenv)
+def evaluate_ood_comparator(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
+    trained_class_str = c['task'][6:].replace("_", " ")
+    cmd = [
+        'python scripts/evaluate_pocky.py',
+        "--method",
+        "Labelfree",
+        f'--seed',
+        c['seed'] + 5,
+        '--num-posterior-iters',
+        1,
+        '--batch-size',
+        BATCH_SIZE_DICT[c["llm_model"]],
+        '--batch-concept-size',
+        LABELFREE_BATCH_CONCEPT_SIZE,
+        "--group-size",
+        4,
+        "--cache",
+        cache_file,
+        "--trained-class",
+        trained_class_str,
+        "--data",
+        DATA_FOLDER,
+        '--training-history-file ${SOURCES[0]}',
+        '--log-file ${TARGETS[0]}',
+        '--csv-file ${TARGETS[1]}',
+        '--prompt-concepts-file', COMPARATOR_PROMPT,
+        '--llm-model-type',
+        c['llm_model'],
+        '--use-api',
+        '--is-image',
+    ]
+
+    sources = c['evaluate_comparator'][2:] + c['evaluate_pocky_comparator']
+    targets = [
+        path_join(outdir, 'log_ood_comparator.txt'),
+        path_join(outdir, 'ood_comparator.csv'),
+    ]
+    c["agg_ood"].append(targets[1])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
 
 @nest.add_target_with_env(localenv)
 def train_blackbox(env, outdir, c):
-  num_classes = len(c['task'][6:].split("_"))
-  max_train_obs = int(c['max_train_frac'] * NUM_BIRDS_PER_CLASS * num_classes * c['test_frac'])
-  cmd = [
-        'python scripts/train_image_blackbox.py',
-        '--seed', c['seed'] + 2,
-        '--in-dataset-file ${SOURCES[0]}',
-        '--indices-csv ${SOURCES[1]}',
-        '--log-file  ${TARGETS[0]}',
-        f"--max-obs", max_train_obs,
-        '--out-mdl ${TARGETS[1]}'
-  ]
-
-  sources = [
-      c['assemble_cub'][0],
-      c['train_test_split'][0],
-  ]
-  targets = [
-      path_join(outdir, 'log_train_image_resnet.txt'),
-      path_join(outdir, 'resnet_image_mdl.pkl'),
-  ]
-
-  return env.Command(
-      targets,
-      sources,
-      ' '.join(map(str, cmd))
-  )
-
-
-@nest.add_target_with_env(localenv)
-def evaluate_blackbox(env, outdir, c):
-  cmd = [
-        'python scripts/evaluate_image_blackbox.py',
-        f'--seed', c['seed'] + 5,
-        '--in-dataset-file ${SOURCES[0]}',
-        '--indices-csv ${SOURCES[1]}',
-        '--in-mdl ${SOURCES[2]}',
-        '--results-csv ${TARGETS[0]}'
-  ]
-
-  sources = [
-      c['assemble_cub'][0],
-      c['train_test_split'][0],
-      c['train_blackbox'][1]
-  ]
-  targets = [
-      path_join(outdir, 'image_resnet_results.csv'),
-  ]
-  c['result_agg'].append(targets[0])
-
-  return env.Command(
-      targets,
-      sources,
-      ' '.join(map(str, cmd))
-  )
-
-@nest.add_target_with_env(localenv)
-def evaluate_pocky_blackbox(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    num_classes = len(c['task'][6:].split("_"))
+    max_train_obs = int(c['max_train_frac'] * NUM_BIRDS_PER_CLASS * num_classes * c['test_frac'])
     cmd = [
-        'python scripts/evaluate_pocky_image_blackbox.py',
-        f'--seed',
-        c['seed'] + 5,
-        '--in-mdl ${SOURCES[1]}',
-        '--log-file ${TARGETS[0]}',
+            'python scripts/train_image_blackbox.py',
+            '--seed', c['seed'] + 2,
+            '--in-dataset-file ${SOURCES[0]}',
+            '--indices-csv ${SOURCES[1]}',
+            '--log-file  ${TARGETS[0]}',
+            f"--max-obs", max_train_obs,
+            '--out-mdl ${TARGETS[1]}'
     ]
 
-    sources = c['train_blackbox']
+    sources = [
+        c['assemble_cub'][0],
+        c['train_test_split'][0],
+    ]
     targets = [
-        path_join(outdir, 'log_pocky_blackbox.txt'),
+        path_join(outdir, 'log_train_image_resnet.txt'),
+        path_join(outdir, 'resnet_image_mdl1.pkl'),
     ]
 
     return env.Command(
@@ -288,48 +419,232 @@ def evaluate_pocky_blackbox(env, outdir, c):
     )
 
 
+@nest.add_target_with_env(localenv)
+def evaluate_blackbox(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    cmd = [
+            'python scripts/evaluate_image_blackbox.py',
+            f'--seed', c['seed'] + 5,
+            '--in-dataset-file ${SOURCES[0]}',
+            '--indices-csv ${SOURCES[1]}',
+            '--in-mdl ${SOURCES[2]}',
+            '--results-csv ${TARGETS[0]}'
+    ]
+
+    sources = [
+        c['assemble_cub'][0],
+        c['train_test_split'][0],
+        c['train_blackbox'][1]
+    ]
+    targets = [
+        path_join(outdir, 'image_resnet_results_ece.csv'),
+    ]
+    c['result_agg'].append(targets[0])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+@nest.add_target_with_env(localenv)
+def evaluate_pocky_blackbox(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    trained_class_str = c['task'][6:].replace("_", " ")
+    cmd = [
+        'python scripts/evaluate_pocky_image_blackbox.py',
+        "--method",
+        "ResNet",
+        '--trained-classes',
+        trained_class_str,
+        f'--seed',
+        c['seed'] + 5,
+        '--in-mdl ${SOURCES[1]}',
+        '--log-file ${TARGETS[0]}',
+        '--csv-file ${TARGETS[1]}',
+    ]
+
+    sources = c['train_blackbox']
+    targets = [
+        path_join(outdir, 'log_pocky_blackbox.txt'),
+        path_join(outdir, 'pocky_blackbox.csv'),
+    ]
+    c["agg_pocky"].append(targets[1])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+@nest.add_target_with_env(localenv)
+def evaluate_ood_blackbox(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    trained_class_str = c['task'][6:].replace("_", " ")
+    cmd = [
+        'python scripts/evaluate_pocky_image_blackbox.py',
+        "--method",
+        "ResNet",
+        f'--seed',
+        c['seed'] + 5,
+        '--trained-classes',
+        trained_class_str,
+        '--dataset-folder',
+        DATA_FOLDER,
+        '--in-mdl ${SOURCES[1]}',
+        '--log-file ${TARGETS[0]}',
+        '--csv-file ${TARGETS[1]}',
+    ]
+
+    sources = c['train_blackbox']
+    targets = [
+        path_join(outdir, 'log_ood_blackbox.txt'),
+        path_join(outdir, 'ood_blackbox.csv'),
+    ]
+    c["agg_ood"].append(targets[1])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+@nest.add_target_with_env(localenv)
+def train_lasso(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    cmd = [
+        "python scripts/train_lasso.py",
+        "--seed",
+        c["seed"] + 1,
+        "--indices ${SOURCES[0]}",
+        "--in-data ${SOURCES[1]}",
+        '--out-mdl ${TARGETS[0]}'
+    ]
+    sources = [
+        c['train_test_split'][0],
+        c["assemble_cub"][0]
+    ]
+    targets = [
+        path_join(outdir, "lasso.pkl")
+    ]
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+@nest.add_target_with_env(localenv)
+def evaluate_lasso(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    cmd = [
+        "python scripts/evaluate_lasso.py",
+        "--seed",
+        c["seed"] + 1,
+        "--indices ${SOURCES[0]}",
+        "--in-data ${SOURCES[1]}",
+        '--in-mdl ${SOURCES[2]}',
+        "--results-csv ${TARGETS[0]}",
+    ]
+    sources = [
+        c['train_test_split'][0],
+        c["assemble_cub"][0],
+        c["train_lasso"][0]
+    ]
+    targets = [
+        path_join(outdir, "lasso_results_ece.csv")
+    ]
+    c['result_agg'].append(targets[0])
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+@nest.add_target_with_env(localenv)
+def evaluate_lasso_ood(env, outdir, c):
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    trained_class_str = c['task'][6:].replace("_", " ")
+    cmd = [
+        "python scripts/evaluate_lasso_pocky.py",
+        "--seed",
+        c["seed"] + 1,
+        "--trained-class",
+        trained_class_str,
+        "--dataset",
+        DATA_FOLDER,
+        '--max-obs', 30,
+        "--indices ${SOURCES[0]}",
+        "--in-data ${SOURCES[1]}",
+        '--in-mdl ${SOURCES[2]}',
+        "--log ${TARGETS[0]}",
+        "--csv ${TARGETS[1]}",
+    ]
+    sources = [
+        c['train_test_split'][0],
+        c["assemble_cub"][0],
+        c["train_lasso"][0]
+    ]
+    targets = [
+        path_join(outdir, "log_ood_lasso.txt"),
+        path_join(outdir, "ood_lasso.csv"),
+    ]
+    c['agg_ood'].append(targets[1])
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
 
 @nest.add_target_with_env(localenv)
 def train_baseline(env, outdir, c):
-    cached_extractions = path_join('exp_cub_birds_existing', outdir, 'baseline_extractions.pkl')
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
     num_classes = len(c['task'][6:].split("_"))
     max_train_obs = int(c['max_train_frac'] * NUM_BIRDS_PER_CLASS * num_classes * c['test_frac'])
     cmd = [
         'python scripts/train_baseline.py',
         f'--seed',
         c['seed'] + 2,
-        '--batch-size', BATCH_SIZE,
+        '--batch-size', BATCH_SIZE_DICT[c["llm_model"]],
         '--num-meta-concepts',
         c['num_meta_concepts'],
         '--learner-type count_l2',
+        '--max-tokens 8000' if c["llm_model"] == CLAUDE else "",
+        '--cache',
+        cache_file,
         '--in-dataset-file ${SOURCES[0]}',
         '--indices-csv ${SOURCES[1]}',
         '--out-training-history-file ${TARGETS[0]}',
         '--log-file  ${TARGETS[1]}',
         '--llm-model-type',
          c['llm_model'],
-         '--use-api' if LLM_DICT[c['llm_model']] else '',
+         '--use-api',
          f"--max-obs", max_train_obs,
-         '--out-extractions', cached_extractions,
          '--is-image',
-         '--prompt-concepts-file', CONCEPTS_PROMPT,
-         '--baseline-init-file', BASELINE_PROMPT,
+         '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
+         '--baseline-init-file', BASELINE_PROMPT_DICT[c["known"]],
          '--init-concepts-file ${SOURCES[2]}'
     ]
+    if c['known']:
+        cmd += ['--config-file', path_join('exp_cub_birds_existing/prompts', f"{c['task']}.json")]
 
     sources = [
         c['assemble_cub'][0],
         c['train_test_split'][0],
         c['llm_extractions_agg'][c['task']],
+        # c['evaluate_comparator'],
     ]
     targets = [
-        path_join(outdir, 'baseline_history.pkl'),
+        path_join(outdir, 'baseline_history2.pkl'),
         path_join(outdir, 'log_train_baseline.txt'),
     ]
     c['train_baseline_history'] = targets[0]
-    if os.path.exists(targets[0]):
-        return
-
     return env.Command(
         targets,
         sources,
@@ -339,23 +654,28 @@ def train_baseline(env, outdir, c):
 nest.add_aggregate('test_extractions', str)
 @nest.add_target_with_env(localenv)
 def evaluate_baseline(env, outdir, c):
-    cached_extractions = path_join(outdir, 'test_extractions.pkl')
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
     cmd = [
         'python scripts/evaluate_bayesian.py',
         f'--seed', c['seed'] + 5,
         '--num-posterior-iters', 1,
-        '--batch-size', BATCH_SIZE,
+        '--batch-size', BATCH_SIZE_DICT[c["llm_model"]],
         '--method-name baseline',
+        '--cache',
+        cache_file,
+        '--batch-concept-size',
+        c['num_meta_concepts'],
+        '--prompt-concepts', CONCEPTS_PROMPT_DICT[c["known"]],
         '--in-dataset-file ${SOURCES[0]}',
         '--indices-csv ${SOURCES[1]}',
         '--training-history-file ${SOURCES[2]}',
-        '--out-extraction', path_join('exp_cub_birds_existing', cached_extractions), # ${TARGETS[1]}',
+        # '--out-extraction', path_join('exp_cub_birds_existing', cached_extractions), # ${TARGETS[1]}',
         '--log-file ${TARGETS[0]}',
         '--llm-model-type', c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         '--is-image',
-        '--calib ${TARGETS[1]}',
-        '--result-csv ${TARGETS[2]}',
+        # '--calib ${TARGETS[1]}',
+        '--result-csv ${TARGETS[1]}',
     ]
 
     sources = [
@@ -364,14 +684,12 @@ def evaluate_baseline(env, outdir, c):
         c['train_baseline_history'],
     ]
     targets = [
-        path_join(outdir, 'test_baseline_log.txt'),
+        path_join(outdir, 'test_baseline_log2.txt'),
         # path_join(outdir, 'test_extractions.pkl'),
-        path_join(outdir, 'calib_baseline.png'),
-        path_join(outdir, 'result_baseline.csv'),
+        # path_join(outdir, 'calib_baseline.png'),
+        path_join(outdir, 'result_baseline_ece.csv'),
     ]
-    c['test_extractions'] = cached_extractions
-    c['all_test_extractions'].append(cached_extractions)
-    c['result_agg'].append(targets[2])
+    c['result_agg'].append(targets[1])
     
     return env.Command(
         targets,
@@ -379,81 +697,98 @@ def evaluate_baseline(env, outdir, c):
         ' '.join(map(str, cmd))
     )
 
-@nest.add_target_with_env(localenv)
-def evaluate_pocky_baseline(env, outdir, c):
-    cached_extractions = path_join("exp_cub_birds_existing", outdir, "extractions_pocky.pkl")
-    cmd = [
-        'python scripts/evaluate_pocky.py',
-        f'--seed',
-        c['seed'] + 5,
-        '--num-posterior-iters',
-        1,
-        '--batch-size',
-        BATCH_SIZE,
-        '--method-name baseline',
-        '--training-history-file ${SOURCES[0]}',
-        '--out-extraction', cached_extractions,
-        '--log-file ${TARGETS[0]}',
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
-        '--llm-model-type',
-        c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
-        '--is-image',
-    ]
+# @nest.add_target_with_env(localenv)
+# def evaluate_pocky_baseline(env, outdir, c):
+#     if c["llm_model"] != GPT4_O_MINI:
+#         return
+#     cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
+#     trained_class_str = c['task'][6:].replace("_", " ")
+#     cmd = [
+#         'python scripts/evaluate_pocky.py',
+#         f'--seed',
+#         c['seed'] + 5,
+#         '--num-posterior-iters',
+#         1,
+#         '--batch-size',
+#         BATCH_SIZE_DICT[c["llm_model"]],
+#         "--cache",
+#         cache_file,
+#         "--trained-class",
+#         trained_class_str,
+#         '--method-name baseline',
+#         '--training-history-file ${SOURCES[0]}',
+#         '--log-file ${TARGETS[0]}',
+#         '--csv-file ${TARGETS[1]}',
+#         '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
+#         '--llm-model-type',
+#         c['llm_model'],
+#         '--use-api',
+#         '--is-image',
+#     ]
 
-    sources = c['train_baseline_history']
-    targets = [
-        path_join(outdir, 'log_pocky_baseline.txt'),
-    ]
+#     sources = c['train_baseline_history']
+#     targets = [
+#         path_join(outdir, 'log_pocky_baseline.txt'),
+#         path_join(outdir, 'pocky_baseline.csv'),
+#     ]
+#     c["agg_pocky"].append(targets[1])
 
-    return env.Command(
-        targets,
-        sources,
-        ' '.join(map(str, cmd))
-    )
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )
 
-@nest.add_target_with_env(localenv)
-def evaluate_ood_baseline(env, outdir, c):
-    cached_extractions = path_join("exp_cub_birds_existing", outdir, "extractions_other_bird.pkl")
-    cmd = [
-        'python scripts/evaluate_pocky.py',
-        f'--seed',
-        c['seed'] + 5,
-        '--num-posterior-iters',
-        1,
-        '--batch-size',
-        BATCH_SIZE,
-        '--method-name baseline',
-        '--training-history-file ${SOURCES[0]}',
-        '--out-extraction', cached_extractions,
-        '--log-file ${TARGETS[0]}',
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
-        '--llm-model-type',
-        c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
-        '--is-image',
-        '--dataset-folder',
-        DATA_FOLDER,
-        '--max-obs', 30,
-        '--bird-class',
-        34 # test on finches
-    ]
+# @nest.add_target_with_env(localenv)
+# def evaluate_ood_baseline(env, outdir, c):
+#     if c["llm_model"] != GPT4_O_MINI:
+#         return
 
-    sources = c['train_baseline_history']
-    targets = [
-        path_join(outdir, 'log_ood_baseline.txt'),
-    ]
+#     cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
+#     trained_class_str = c['task'][6:].replace("_", " ")
+#     cmd = [
+#         'python scripts/evaluate_pocky.py',
+#         f'--seed',
+#         c['seed'] + 5,
+#         '--num-posterior-iters',
+#         1,
+#         "--cache",
+#         cache_file,
+#         '--batch-size',
+#         BATCH_SIZE_DICT[c["llm_model"]],
+#         '--method-name baseline',
+#         '--training-history-file ${SOURCES[0]}',
+#         '--log-file ${TARGETS[0]}',
+#         '--csv-file ${TARGETS[1]}',
+#         '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
+#         '--llm-model-type',
+#         c['llm_model'],
+#         '--use-api',
+#         '--is-image',
+#         '--dataset-folder',
+#         DATA_FOLDER,
+#         '--max-obs', 30,
+#         '--trained-classes',
+#         trained_class_str,
+#     ]
 
-    return env.Command(
-        targets,
-        sources,
-        ' '.join(map(str, cmd))
-    )
+#     sources = c['train_baseline_history']
+#     targets = [
+#         path_join(outdir, 'log_ood_baseline.txt'),
+#         path_join(outdir, 'ood_baseline.csv'),
+#     ]
+#     c["agg_ood"].append(targets[1])
+
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )
 
 
 @nest.add_target_with_env(localenv)
 def train_boosting(env, outdir, c):
-    cached_extractions = path_join('exp_cub_birds_existing', outdir, 'boosting_extractions.pkl')
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
     num_classes = len(c['task'][6:].split("_"))
     max_train_obs = int(c['max_train_frac'] * NUM_BIRDS_PER_CLASS * num_classes * c['test_frac'])
     cmd = [
@@ -462,32 +797,31 @@ def train_boosting(env, outdir, c):
         c['seed'] + 2,
         '--num-boost-samples', 2,
         '--num-iters', NUM_BOOST_ITERS,
-        '--batch-size', BATCH_SIZE,
-        '--boosting-prompt', BOOSTING_PROMPT,
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
+        '--batch-size', BATCH_SIZE_DICT[c["llm_model"]],
+        '--boosting-prompt', BOOSTING_PROMPT_DICT[c["known"]],
+        '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
+        '--cache',
+        cache_file,
         '--in-dataset-file ${SOURCES[0]}',
         '--indices-csv ${SOURCES[1]}',
         '--out-training-history-file ${TARGETS[0]}',
         '--log-file  ${TARGETS[1]}',
         '--llm-model-type', c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         "--max-obs", max_train_obs,
-        '--out-extractions', cached_extractions,
-         '--is-image',
+        '--is-image',
     ]
 
     sources = [
         c["assemble_cub"][0],
         c['train_test_split'][0],
+        # c["evaluate_baseline"],
     ]
     targets = [
         path_join(outdir, 'boosting_history.pkl'),
         path_join(outdir, 'log_train_boosting.txt')
     ]
-    c['train_boosting_history'] = targets[0]
-    if os.path.exists(targets[0]):
-        return
-
+    
     return env.Command(
         targets,
         sources,
@@ -496,6 +830,7 @@ def train_boosting(env, outdir, c):
 
 @nest.add_target_with_env(localenv)
 def evaluate_boosting(env, outdir, c):
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
     cmd = [
         'python scripts/evaluate_bayesian.py',
         f'--seed',
@@ -504,33 +839,31 @@ def evaluate_boosting(env, outdir, c):
         '--num-posterior-iters',
         1,
         '--batch-size',
-        BATCH_SIZE,
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
+        BATCH_SIZE_DICT[c["llm_model"]],
+        '--cache',
+        cache_file,
+        '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
         '--in-dataset-file ${SOURCES[0]}',
         '--indices-csv ${SOURCES[1]}',
         '--training-history-file ${SOURCES[2]}',
-        '--out-extraction ${SOURCES[3]}',
         '--log-file ${TARGETS[0]}',
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
-        '--result-csv ${TARGETS[2]}',
-        '--calib ${TARGETS[1]}',
+        '--use-api',
+        '--result-csv ${TARGETS[1]}',
         '--is-image',
     ]
 
     sources = [
         c["assemble_cub"][0],
         c['train_test_split'][0],
-        c['train_boosting_history'],
-        c['test_extractions'],
+        c['train_boosting'][0],
     ]
     targets = [
         path_join(outdir, 'test_boosting_log.txt'),
-        path_join(outdir, 'calib_boosting.png'),
-        path_join(outdir, 'result_boosting.csv'),
+        path_join(outdir, 'result_boosting_ece.csv'),
     ]
-    c['result_agg'].append(targets[2])
+    c['result_agg'].append(targets[1])
 
     return env.Command(
         targets,
@@ -538,77 +871,93 @@ def evaluate_boosting(env, outdir, c):
         ' '.join(map(str, cmd))
     )
 
-@nest.add_target_with_env(localenv)
-def evaluate_pocky_boosting(env, outdir, c):
-    cached_extractions = path_join("exp_cub_birds_existing", outdir, "boosting_extractions_pocky.pkl")
-    cmd = [
-        'python scripts/evaluate_pocky.py',
-        f'--seed',
-        c['seed'] + 5,
-        '--num-posterior-iters',
-        1,
-        '--batch-size',
-        BATCH_SIZE,
-        '--method-name boosting',
-        '--training-history-file ${SOURCES[0]}',
-        '--out-extraction', cached_extractions,
-        '--log-file ${TARGETS[0]}',
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
-        '--llm-model-type',
-        c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
-        '--is-image',
-    ]
+# @nest.add_target_with_env(localenv)
+# def evaluate_pocky_boosting(env, outdir, c):
+#     if c["llm_model"] != GPT4_O_MINI:
+#         return
+#     cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
+#     trained_class_str = c['task'][6:].replace("_", " ")
+#     cmd = [
+#         'python scripts/evaluate_pocky.py',
+#         f'--seed',
+#         c['seed'] + 5,
+#         '--num-posterior-iters',
+#         1,
+#         '--batch-size',
+#         BATCH_SIZE_DICT[c["llm_model"]],
+#         '--cache',
+#         cache_file,
+#         '--method-name boosting',
+#         '--training-history-file ${SOURCES[0]}',
+#         '--log-file ${TARGETS[0]}',
+#         '--csv-file ${TARGETS[1]}',
+#         '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
+#         '--llm-model-type',
+#         c['llm_model'],
+#         '--use-api',
+#         '--is-image',
+#         '--trained-class',
+#         trained_class_str
+#     ]
 
-    sources = c['train_boosting_history']
-    targets = [
-        path_join(outdir, 'log_pocky_boosting.txt'),
-    ]
+#     sources = c['train_boosting']
+#     targets = [
+#         path_join(outdir, 'log_pocky_boosting.txt'),
+#         path_join(outdir, 'pocky_boosting.csv'),
+#     ]
+#     c['agg_pocky'].append(targets[1])
 
-    return env.Command(
-        targets,
-        sources,
-        ' '.join(map(str, cmd))
-    )
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )
 
 
-@nest.add_target_with_env(localenv)
-def evaluate_ood(env, outdir, c):
-    cached_extractions = path_join("exp_cub_birds_existing", outdir, "extractions_other_bird.pkl")
-    cmd = [
-        'python scripts/evaluate_pocky.py',
-        f'--seed',
-        c['seed'] + 5,
-        '--num-posterior-iters',
-        1,
-        '--batch-size',
-        BATCH_SIZE,
-        '--method-name boosting',
-        '--training-history-file ${SOURCES[0]}',
-        '--out-extraction', cached_extractions,
-        '--log-file ${TARGETS[0]}',
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
-        '--llm-model-type',
-        c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
-        '--is-image',
-        '--dataset-folder',
-        DATA_FOLDER,
-        '--max-obs', 30,
-        '--bird-class',
-        34 # test on finches
-    ]
+# @nest.add_target_with_env(localenv)
+# def evaluate_ood(env, outdir, c):
+#     if c["llm_model"] != GPT4_O_MINI:
+#         return
+#     cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
+#     trained_class_str = c['task'][6:].replace("_", " ")
+#     cmd = [
+#         'python scripts/evaluate_pocky.py',
+#         f'--seed',
+#         c['seed'] + 5,
+#         '--num-posterior-iters',
+#         1,
+#         "--cache",
+#         cache_file,
+#         '--batch-size',
+#         BATCH_SIZE_DICT[c["llm_model"]],
+#         '--method-name boosting',
+#         '--training-history-file ${SOURCES[0]}',
+#         '--log-file ${TARGETS[0]}',
+#         '--csv-file ${TARGETS[1]}',
+#         '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
+#         '--llm-model-type',
+#         c['llm_model'],
+#         '--use-api',
+#         '--is-image',
+#         '--dataset-folder',
+#         DATA_FOLDER,
+#         '--max-obs', 30,
+#         '--trained-class',
+#         trained_class_str
+#     ]
 
-    sources = c['train_boosting_history']
-    targets = [
-        path_join(outdir, 'log_ood_boosting.txt'),
-    ]
+#     sources = c['train_boosting']
+#     targets = [
+#         path_join(outdir, 'log_ood_boosting.txt'),
+#         path_join(outdir, 'ood_boosting.csv'),
+#     ]
+#     c["agg_ood"].append(targets[1])
 
-    return env.Command(
-        targets,
-        sources,
-        ' '.join(map(str, cmd))
-    )
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )
 
 nest.add(
     'bayesian',
@@ -627,59 +976,62 @@ nest.add(
 nest.add_aggregate('train_bayesian_history', str)
 @nest.add_target_with_env(localenv)
 def train_bayesian(env, outdir, c):
-    cached_extractions = path_join('exp_cub_birds_existing', outdir, 'extractions.pkl')
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
     num_classes = len(c['task'][6:].split("_"))
     max_train_obs = int(c['max_train_frac'] * NUM_BIRDS_PER_CLASS * num_classes * c['test_frac'])
     cmd = [
         'python scripts/train_bayesian.py',
         f'--seed',
         c['seed'] + 4,
-        '--batch-size', BATCH_SIZE,
-        '--num-greedy', NUM_GREEDY,
-        '--num-restricted-epochs',
-        NUM_RESTRICTED_EPOCHS,
+        '--batch-size', BATCH_SIZE_DICT[c["llm_model"]],
+        '--num-greedy-epochs', NUM_GREEDY,
         '--max-epochs',
         min(NUM_EPOCHS, MAX_ITERS//c['num_meta_concepts']),
         '--num-meta-concepts',
         c['num_meta_concepts'],
         '--learner-type count_l2',
+        '--final-learner-type l2',
         '--train-frac', c['train_frac'],
         '--in-dataset-file ${SOURCES[0]}',
         '--indices-csv ${SOURCES[2]}',
-        '--out-extraction', cached_extractions,
         '--log-file ${TARGETS[0]}',
         '--init-history-file ${SOURCES[1]}',
         '--training-history-file ${TARGETS[1]}',
         '--aucs-plot-file ${TARGETS[2]}',
+        '--cache',
+        cache_file,
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         "--max-obs", max_train_obs,
         '--is-image',
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
-        '--prompt-prior-file', BAYESIAN_PRIOR_PROMPT,
-        '--prompt-iter-file', BAYESIAN_ITER_PROMPT,
+        '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
+        '--prompt-prior-file', BAYESIAN_PRIOR_PROMPT_DICT[c["known"]],
+        '--prompt-iter-file', BAYESIAN_ITER_PROMPT_DICT[c["known"]][c["llm_model"]],
         '--prompt-iter-type conditional',
         '--init-concepts-file ${SOURCES[3]}',
-        '--do-greedy' if c['bayesian'] == 'greedy' else '',
+        "--is-greedy-metric-acc",
+        '--out-extract ${TARGETS[3]}',
     ]
+    if c['known']:
+        cmd += ['--config-file', path_join('exp_cub_birds_existing/prompts', f"{c['task']}.json")]
 
     sources = [
         c['assemble_cub'][0],
         c['train_baseline_history'],
         c['train_test_split'][0],
         c['llm_extractions_agg'][c['task']],
+        # c['evaluate_baseline'],
     ]
     targets = [
         path_join(outdir, 'log_train_bayesian.txt'),
-        path_join(outdir, 'training_history.pkl'),
+        path_join(outdir, 'training_history4.pkl'),
         path_join(outdir, 'aucs.png'),
+        path_join(outdir, 'extractions.csv'),
     ]
     c['train_bayesian_history'] = targets[1]
     c['bayesian_agg'].append(targets[1])
-    if os.path.exists(targets[1]):
-        return
-
+    c['all_test_extractions'].append(targets[3])
     return env.Command(
         targets,
         sources,
@@ -688,6 +1040,7 @@ def train_bayesian(env, outdir, c):
 
 @nest.add_target_with_env(localenv)
 def evaluate_bayesian(env, outdir, c):
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
     cmd = [
         'python scripts/evaluate_bayesian.py',
         f'--seed',
@@ -695,34 +1048,37 @@ def evaluate_bayesian(env, outdir, c):
         '--num-posterior-iters',
         (min(NUM_EPOCHS, MAX_ITERS//c['num_meta_concepts']) - 1) * c['num_meta_concepts'],
         '--batch-size',
-        BATCH_SIZE,
+        BATCH_SIZE_DICT[c["llm_model"]],
+        '--cache',
+        cache_file,
+        '--batch-concept-size',
+        c['num_meta_concepts'],
         '--method-name bayesian',
         '--in-dataset-file ${SOURCES[0]}',
         '--indices-csv ${SOURCES[1]}',
         '--training-history-file ${SOURCES[2]}',
-        '--out-extraction ${SOURCES[3]}',
+        # '--out-extraction ${SOURCES[3]}',
         '--log-file ${TARGETS[0]}',
         '--llm-model-type',
         c['llm_model'],
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
+        '--use-api',
         '--is-image',
-        '--calib ${TARGETS[1]}',
-        '--result-csv ${TARGETS[2]}',
+        # '--calib ${TARGETS[1]}',
+        '--result-csv ${TARGETS[1]}',
     ]
 
     sources = [
         c['assemble_cub'][0],
         c['train_test_split'][0],
         c['train_bayesian_history'],
-        c['test_extractions']
     ]
     targets = [
-        path_join(outdir, 'test_bayesian_log.txt'),
-        path_join(outdir, 'calib_bayesian.png'),
-        path_join(outdir, 'result_bayesian.csv'),
+        path_join(outdir, 'test_bayesian_log1.txt'),
+        # path_join(outdir, 'calib_bayesian.png'),
+        path_join(outdir, 'result_bayesian_ece.csv'),
     ]
-    c['result_agg'].append(targets[2])
+    c['result_agg'].append(targets[1])
 
     return env.Command(
         targets,
@@ -733,7 +1089,10 @@ def evaluate_bayesian(env, outdir, c):
 
 @nest.add_target_with_env(localenv)
 def evaluate_pocky(env, outdir, c):
-    cached_extractions = path_join("exp_cub_birds_existing", outdir, "extractions_pocky.pkl")
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
+    trained_class_str = c['task'][6:].replace("_", " ")
     cmd = [
         'python scripts/evaluate_pocky.py',
         f'--seed',
@@ -741,22 +1100,28 @@ def evaluate_pocky(env, outdir, c):
         '--num-posterior-iters',
         (min(NUM_EPOCHS, MAX_ITERS//c['num_meta_concepts']) - 1) * c['num_meta_concepts'],
         '--batch-size',
-        BATCH_SIZE,
+        BATCH_SIZE_DICT[c["llm_model"]],
+        "--trained-class",
+        trained_class_str,
+        "--cache",
+        cache_file,
         '--method-name bayesian',
         '--training-history-file ${SOURCES[0]}',
-        '--out-extraction', cached_extractions,
         '--log-file ${TARGETS[0]}',
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
+        '--csv-file ${TARGETS[1]}',
+        '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         '--is-image',
     ]
 
     sources = c['train_bayesian_history']
     targets = [
         path_join(outdir, 'log_pocky.txt'),
+        path_join(outdir, 'pocky_bayesian.csv'),
     ]
+    c["agg_pocky"].append(targets[1])
 
     return env.Command(
         targets,
@@ -766,35 +1131,42 @@ def evaluate_pocky(env, outdir, c):
 
 @nest.add_target_with_env(localenv)
 def evaluate_ood(env, outdir, c):
-    cached_extractions = path_join("exp_cub_birds_existing", outdir, "extractions_other_bird.pkl")
+    if c["llm_model"] != GPT4_O_MINI:
+        return
+    cache_file =  f"exp_cub_birds_existing/_output/{c['task']}.db"
+    trained_class_str = c['task'][6:].replace("_", " ")
     cmd = [
         'python scripts/evaluate_pocky.py',
+        "--cache",
+        cache_file,
         f'--seed',
         c['seed'] + 5,
         '--num-posterior-iters',
         (min(NUM_EPOCHS, MAX_ITERS//c['num_meta_concepts']) - 1) * c['num_meta_concepts'],
         '--batch-size',
-        BATCH_SIZE,
+        BATCH_SIZE_DICT[c["llm_model"]],
         '--method-name bayesian',
         '--training-history-file ${SOURCES[0]}',
-        '--out-extraction', cached_extractions,
         '--log-file ${TARGETS[0]}',
-        '--prompt-concepts-file', CONCEPTS_PROMPT,
+        '--csv-file ${TARGETS[1]}',
+        '--prompt-concepts-file', CONCEPTS_PROMPT_DICT[c["known"]],
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         '--is-image',
         '--dataset-folder',
         DATA_FOLDER,
         '--max-obs', 30,
-        '--bird-class',
-        34 # test on finches
+        '--trained-classes',
+        trained_class_str
     ]
 
     sources = c['train_bayesian_history']
     targets = [
         path_join(outdir, 'log_ood.txt'),
+        path_join(outdir, 'ood_bayesian.csv'),
     ]
+    c["agg_ood"].append(targets[1])
 
     return env.Command(
         targets,
@@ -811,11 +1183,13 @@ def evaluate_ood(env, outdir, c):
 #         '--num-posterior-iters',
 #         NUM_ITERS * c['num_meta_concepts'],
 #         '--history-file ${SOURCES[0]}',
-#         '--plot-file ${TARGETS[0]}',
+#         '--plot-hier ${TARGETS[0]}',
+#         '--extract ${SOURCES[1]}',
 #     ]
 
 #     sources = [
 #         c['train_bayesian'][1],
+#         c['train_bayesian'][3],
 #     ]
 #     targets = [
 #         path_join(outdir, 'bayesian_embed.png'),
@@ -843,7 +1217,7 @@ def agg_results1(env, outdir, c):
 
     sources = c['result_agg']
     targets = [
-        path_join(outdir, 'agg_res.csv'),
+        path_join(outdir, 'agg_res_ece.csv'),
     ]
     c['res_agg_final'].append(targets[0])
 
@@ -855,28 +1229,28 @@ def agg_results1(env, outdir, c):
 
 nest.pop('max_train_frac')
 
-@nest.add_target_with_env(localenv)
-def plot_bayesian_agg(env, outdir, c):
-    cmd = [
-        'python scripts/plot_exp_cub_birds_embeddings.py',
-        f'--seed',
-        c['seed'] + 15,
-        '--num-posterior-iters',
-        (min(NUM_EPOCHS, MAX_ITERS//c['num_meta_concepts']) - 1) * c['num_meta_concepts'],
-        '--history-file ${SOURCES[0]} ${SOURCES[1]}', # ${SOURCES[3]}',
-        '--extraction-file ${SOURCES[2]} ${SOURCES[3]}', # ${SOURCES[6]} ${SOURCES[7]}',
-        '--plot-hier ${TARGETS[0]}',
-    ]
-    sources = c['bayesian_agg'] + c['all_test_extractions']
-    targets = [
-        path_join(outdir, 'bayesian_hier.png'),
-    ]
+# @nest.add_target_with_env(localenv)
+# def plot_bayesian_agg(env, outdir, c):
+#     cmd = [
+#         'python scripts/plot_exp_cub_birds_embeddings.py',
+#         f'--seed',
+#         c['seed'] + 15,
+#         '--num-posterior-iters',
+#         (min(NUM_EPOCHS, MAX_ITERS//c['num_meta_concepts']) - 1) * c['num_meta_concepts'],
+#         '--history-file ${SOURCES[0]} ${SOURCES[1]}', # ${SOURCES[3]}',
+#         '--extraction-file ${SOURCES[2]} ${SOURCES[3]}', # ${SOURCES[6]} ${SOURCES[7]}',
+#         '--plot-hier ${TARGETS[0]}',
+#     ]
+#     sources = c['bayesian_agg'] + c['all_test_extractions']
+#     targets = [
+#         path_join(outdir, 'bayesian_hier.png'),
+#     ]
 
-    return env.Command(
-        targets,
-        sources,
-        ' '.join(map(str, cmd))
-    )
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )
 
 nest.pop('seed')
 
@@ -888,6 +1262,7 @@ def agg_results2(env, outdir, c):
         '--add-val', c['task'],
         '--result-files ${SOURCES}',
         '--csv-file ${TARGETS[0]}',
+        "--index-col", 0
     ]
 
     sources = c['res_agg_final']
@@ -902,26 +1277,6 @@ def agg_results2(env, outdir, c):
         ' '.join(map(str, cmd))
     )
 
-# @nest.add_target_with_env(localenv)
-# def plot(env, outdir, c):
-#     cmd = [
-#         'python scripts/plot_exp_cub_birds.py',
-#         '--title', c['task'],
-#         '--in-result ${SOURCES[0]}',
-#         '--plot ${TARGETS[0]}',
-#     ]
-
-#     sources = c['agg_results2']
-#     targets = [
-#         path_join(outdir, 'birds_compare.png'),
-#     ]
-
-#     return env.Command(
-#         targets,
-#         sources,
-#         ' '.join(map(str, cmd))
-#     )
-
 nest.pop('task')
 
 @nest.add_target_with_env(localenv)
@@ -934,7 +1289,7 @@ def agg_results3(env, outdir, c):
 
     sources = c['res_agg_birds']
     targets = [
-        path_join(outdir, 'agg_res_birds.csv'),
+        path_join(outdir, f'agg_res_birds_{LLM}.csv'),
     ]
 
     return env.Command(
@@ -950,11 +1305,19 @@ def plot(env, outdir, c):
         'python scripts/plot_exp_cub_birds.py',
         '--in-result ${SOURCES[0]}',
         '--log-file ${TARGETS[0]}',
+        '--auc-csv-file ${TARGETS[1]}',
+        '--brier-csv-file ${TARGETS[2]}',
+        '--acc-csv-file ${TARGETS[3]}',
+        '--ece-csv-file ${TARGETS[4]}',
     ]
 
     sources = c['agg_results3']
     targets = [
-        path_join(outdir, 'agg_res_birds.txt'),
+        path_join(outdir, f'agg_res_birds_{LLM}.txt'),
+        path_join(outdir, f'all_auc_agg_birds_{LLM}.csv'),
+        path_join(outdir, f'all_brier_agg_birds_{LLM}.csv'),
+        path_join(outdir, f'all_acc_agg_birds_{LLM}.csv'),
+        path_join(outdir, f'all_ece_agg_birds_{LLM}.csv'),
     ]
 
     return env.Command(
@@ -963,3 +1326,88 @@ def plot(env, outdir, c):
         ' '.join(map(str, cmd))
     )
 
+
+
+# @nest.add_target_with_env(localenv)
+# def agg_results_ood(env, outdir, c):
+#     cmd = [
+#         'python scripts/aggregate_results.py',
+#         '--result-files ${SOURCES}',
+#         '--csv-file ${TARGETS[0]}',
+#         '--index-col',
+#         0,
+#         "--groupby",
+#         "method"
+#     ]
+
+#     sources = c['agg_ood']
+#     targets = [
+#         path_join(outdir, 'agg_ood.csv'),
+#     ]
+
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )
+
+# @nest.add_target_with_env(localenv)
+# def plot_ood(env, outdir, c):
+#     cmd = [
+#         'python scripts/plot_exp_cub_birds_ood.py',
+#         '--in-result ${SOURCES[0]}',
+#         '--plot-entr ${TARGETS[0]}',
+#     ]
+
+#     sources = c['agg_results_ood']
+#     targets = [
+#         path_join(outdir, 'agg_ood.png'),
+#     ]
+
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )
+
+# @nest.add_target_with_env(localenv)
+# def agg_results_pocky(env, outdir, c):
+#     cmd = [
+#         'python scripts/aggregate_results.py',
+#         '--result-files ${SOURCES}',
+#         '--csv-file ${TARGETS[0]}',
+#         '--index-col',
+#         0,
+#         "--groupby",
+#         "method"
+#     ]
+
+#     sources = c['agg_pocky']
+#     targets = [
+#         path_join(outdir, 'agg_pocky.csv'),
+#     ]
+
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )
+
+# @nest.add_target_with_env(localenv)
+# def plot_pocky(env, outdir, c):
+#     cmd = [
+#         'python scripts/plot_exp_cub_birds_ood.py',
+#         '--in-result ${SOURCES[0]}',
+#         '--plot-entr ${TARGETS[0]}',
+#     ]
+
+#     sources = c['agg_results_pocky']
+#     targets = [
+#         path_join(outdir, 'agg_pocky.png'),
+#     ]
+
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )

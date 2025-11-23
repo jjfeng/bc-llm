@@ -11,16 +11,30 @@ Assign a non-zero prior probability for each of the candidate meta-concepts. To 
 
 Note if two candidate meta-concepts are the same, they should be assigned the same prior probability.
 
-Summarize all the candidate meta-concepts with non-zero prior probabilities at the end with a valid JSON, formatted as follows:
+Provide the assigned prior probability for each candidate meta-concept in a JSON formatted as follows:
 {
-    "0": <PRIOR_PROBABILITY>,
-    "1": <PRIOR_PROBABILITY>,
-    ...
+    "candidate_priors": [
+        {
+            "candidate_id": <CANDIDATE_ID>,
+            "reasoning": <REASONING (optional)>,
+            "prior": <PRIOR_PROBABILITY>
+        },
+        ...
+    ]
 }
 Example:
 {
-    "0": 0.1,
-    "1": 0.4,
-    ...
+    "candidate_priors": [
+        {
+            "candidate_id": 0,
+            "reasoning": "This candidate is very likely because...",
+            "prior": 0.4
+        },
+        {
+            "candidate_id": 1,
+            "reasoning": "This candidate is slightly less likely because...",
+            "prior": 0.3
+        },
+        ...
+    ]
 }
-Do not add comments to the JSON.

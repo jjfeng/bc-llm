@@ -29,6 +29,12 @@ nest = SConsWrap(Nest(), localenv['output'], alias_environment=localenv)
 
 MIMIC_DATA = 'exp_mimic/data/mimic_social_history.csv'
 BOOSTING_PROMPT = 'exp_mimic/prompts/boosting_iter.txt'
+BASELINE_PROMPT = 'exp_mimic/prompts/baseline_init.txt'
+
+EXTRACT_LLM_PROMPT_DICT = {
+    # 'orig' : 'exp_mimic/prompts/extract_keyphrases.txt', # THIS IS THE PROMPT FOR MAIN MANUSCRIPT
+    'ablation' : 'exp_mimic/prompts/extract_keyphrases_ablation.txt' # THIS IS PROMPT FOR ABLATION
+}
 
 NUM_EPOCHS = 5  # bayesian epochs
 NUM_GREEDY_EPOCHS = 1
@@ -37,32 +43,12 @@ NUM_NEW_TOKENS = 600
 BATCH_SIZE = 8
 
 LLM_MODELS = [
-    'gpt-4o-mini',
-    'cohere-command-r',
-    # "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    # "meta-llama/Meta-Llama-3.1-70B-Instruct"
-    # 'meta-llama/Llama-3.2-11B-Vision-Instruct'
+    'gpt-4o-mini'
 ]
-LLM_DICT = {
-    'cohere-command-r': {
-        "api": True,  # true using API
-        "extract_prompt": 'exp_mimic/prompts/extract.txt',
-        "conditional": 'exp_mimic/prompts/bayesian_iter_restrict.txt'
-    },
-    'gpt-4o-mini': {
-        "api": True,
-        "extract_prompt": 'exp_mimic/prompts/age.txt',
-        "conditional": 'exp_mimic/prompts/bayesian_iter.txt'
-    }
-    # 'meta-llama/Meta-Llama-3.1-8B-Instruct': False,  # False, not using API
-    # 'meta-llama/Meta-Llama-3.1-70B-Instruct': False, # False, not using API
-    # 'meta-llama/Llama-3.2-11B-Vision-Instruct': False,
-}
 
 PROMPT_PRIOR_DICT = {
     "conditional": 'exp_mimic/prompts/candidate_concept_priors_conditional.txt',
     "marginal": 'exp_mimic/prompts/candidate_concept_priors_conditional.txt',
-    "error_obs_w_conditional": 'exp_mimic/prompts/candidate_concept_priors_error_obs_w_conditional.txt',
 }
 X_DATA_DICT = {
     "short_notes": 'chief_complaint social_history',
@@ -86,7 +72,7 @@ Y_DATA_DICT = {
         "num_meta_concepts": [
             6,
         ],
-        "oracle": 'exp_mimic/oracle_concept_history.pkl',
+        "oracle": 'exp_mimic/oracle_concept5_history.pkl',
     }
 }
 
@@ -95,7 +81,6 @@ ITER_PROMPTS = {
 }
 
 CONCEPT_PROMPT_DICT = {
-    "binary": 'exp_mimic/prompts/concept_questions.txt',
     "probabilistic": 'exp_mimic/prompts/concept_questions_probabilistic.txt'
 }
 
@@ -137,8 +122,10 @@ def make_notes_data(env, outdir, c):
 
 
 nest.add_aggregate('llm_concept_extract_agg', dict)
+
 nest.add('llm_model', LLM_MODELS)
 
+nest.add('keyphrase', list(EXTRACT_LLM_PROMPT_DICT.keys()))
 
 @nest.add_target_with_env(localenv)
 def extract_llm_output(env, outdir, c):
@@ -146,7 +133,7 @@ def extract_llm_output(env, outdir, c):
         path_join(outdir, 'log_extract_hierarchy.txt'),
         path_join(outdir, 'concept_extractions.csv'),
     ]
-    c['llm_concept_extract_agg'][c['llm_model']] = targets[1]
+    c['llm_concept_extract_agg'][(c['llm_model'], c['keyphrase'])] = targets[1]
     if os.path.exists(targets[1]):
         return
 
@@ -155,15 +142,15 @@ def extract_llm_output(env, outdir, c):
         f'--seed',
         0,
         '--batch-size',
-        BATCH_SIZE,
+        BATCH_SIZE * 3,
         '--num-new-tokens', NUM_NEW_TOKENS,
         '--in-dataset-file ${SOURCES[0]}',
-        '--prompt-file', EXTRACT_LLM_PROMPT,
+        '--prompt-file', EXTRACT_LLM_PROMPT_DICT[c['keyphrase']],
         '--log-file ${TARGETS[0]}',
         '--llm-output ${TARGETS[1]}',
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else ''
+        '--use-api'
     ]
 
     sources = [
@@ -183,7 +170,12 @@ nest.add('y_data', ['high_snr_4'])
 nest.add_aggregate('res_agg_final', list)
 nest.add_aggregate('coverage_agg', list)
 nest.add('replicate_seed',
-    [2,3,4,5],
+    [
+        2,
+        3,
+        4,
+        5,
+    ],
     label_func=lambda c: "replicate_seed_%d" % c
 )
 
@@ -250,17 +242,16 @@ def train_test_split(env, outdir, c):
 nest.add(
     'y_llm',
     [
-        # True, # train models for simulated Y based on LLM-generated annotations
         False,  # train models for simulated Y based on MIMIC annotations
     ],
     label_func=lambda c: "LLM_labels_%s" % c)
 
 nest.add('llm_model', LLM_MODELS)
+nest.add('keyphrase', list(EXTRACT_LLM_PROMPT_DICT.keys()))
 
 nest.add(
     'concept_extraction_type',
     [
-        # "binary",
         "probabilistic"
     ],
     label_func=lambda c: "extraction_type_%s" % c)
@@ -347,6 +338,7 @@ def train_known_concepts(env, outdir, c):
         f'--seed',
         c['replicate_seed'] + 2,
         '--batch-size', BATCH_SIZE,
+        '--baseline-init', BASELINE_PROMPT,
         '--num-meta-concepts',
         Y_DATA_DICT[c['y_data']]['num_oracle_meta_concepts'],
         '--prompt-concepts-file', CONCEPT_PROMPT_DICT[c['concept_extraction_type']],
@@ -357,7 +349,7 @@ def train_known_concepts(env, outdir, c):
         '--out-training-history-file ${TARGETS[0]}',
         '--log-file  ${TARGETS[1]}',
         '--llm-model-type', c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         f"--max-obs {c['max_train_obs']}" if c['max_train_obs'] else '',
         '--out-extractions', cached_extractions,
         '--init-concepts-file ${SOURCES[2]}',
@@ -366,7 +358,7 @@ def train_known_concepts(env, outdir, c):
     sources = [
         c[label_setting][0],
         c['train_test_split'][0],
-        c['llm_concept_extract_agg'][c['llm_model']]
+        c['llm_concept_extract_agg'][(c['llm_model'], c['keyphrase'])]
     ]
     targets = [
         path_join(outdir, 'oracle_history.pkl'),
@@ -400,7 +392,7 @@ def evaluate_oracle(env, outdir, c):
         '--log-file ${TARGETS[0]}',
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         '--calib-plot ${TARGETS[1]}',
         '--result-csv ${TARGETS[2]}',
     ]
@@ -506,6 +498,7 @@ def train_baseline(env, outdir, c):
       f'--seed',
       c['replicate_seed'] + 2,
       '--batch-size', BATCH_SIZE,
+      '--baseline-init', BASELINE_PROMPT,
       '--num-meta-concepts',
       c['num_meta_concepts'],
       '--learner-type', c['residual_learner'],
@@ -516,7 +509,7 @@ def train_baseline(env, outdir, c):
       '--log-file  ${TARGETS[1]}',
       '--llm-model-type',
       c['llm_model'],
-      '--use-api' if LLM_DICT[c['llm_model']] else '',
+      '--use-api',
       f"--max-obs {c['max_train_obs']}" if c['max_train_obs'] else '',
       '--out-extractions', cached_extractions,
       '--init-concepts-file ${SOURCES[2]}',
@@ -525,13 +518,67 @@ def train_baseline(env, outdir, c):
     sources = [
         c[label_setting][0],
         c['train_test_split'][0],
-        c['llm_concept_extract_agg'][c['llm_model']],
+        c['llm_concept_extract_agg'][(c['llm_model'], c['keyphrase'])],
     ]
     targets = [
         path_join(outdir, 'baseline_history.pkl'),
         path_join(outdir, 'log_train_baseline.txt')
     ]
 
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+
+@nest.add_target_with_env(localenv)
+def train_coord(env, outdir, c):
+    label_setting = 'make_llm_labels' if c['y_llm'] else 'make_labels'
+    cached_extractions = os.path.join('exp_mimic', outdir, 'extractions.pkl')
+    cmd = [
+        'python scripts/train_bayesian.py',
+        f'--seed',
+        c['replicate_seed'] + 2,
+        '--batch-size', 40, #BATCH_SIZE,
+        '--num-greedy-epoch', NUM_EPOCHS,
+        '--max-epochs',
+        NUM_EPOCHS,
+        '--num-meta-concepts',
+        c['num_meta_concepts'],
+        '--train-frac', 0.5,
+        '--prompt-iter-type conditional',
+        '--prompt-concepts-file', CONCEPT_PROMPT_DICT[c['concept_extraction_type']],
+        '--prompt-prior-file', PROMPT_PRIOR_DICT['conditional'],
+        '--learner-type', c['residual_learner'],
+        '--in-dataset-file ${SOURCES[0]}',
+        '--indices-csv ${SOURCES[2]}',
+        '--out-extraction', cached_extractions,
+        '--log-file ${TARGETS[0]}',
+        '--init-history-file ${SOURCES[1]}',
+        '--training-history-file ${TARGETS[1]}',
+        '--aucs-plot-file ${TARGETS[2]}',
+        '--llm-model-type',
+        c['llm_model'],
+        '--use-api',
+        '--prompt-iter-file', ITER_PROMPTS['conditional'],
+        f"--max-obs {c['max_train_obs']}" if c['max_train_obs'] else '',
+        '--init-concepts-file ${SOURCES[3]}',
+        '--do-greedy',
+    ]
+
+    sources = [
+        c[label_setting][0],
+        c['train_baseline'][0],
+        c['train_test_split'][0],
+        c['llm_concept_extract_agg'][(c['llm_model'], c['keyphrase'])],
+    ]
+    targets = [
+        path_join(outdir, 'log_train_coord.txt'),
+        path_join(outdir, 'training_history_coord.pkl'),
+        path_join(outdir, 'aucs_coord.png'),
+    ]
+    
     return env.Command(
         targets,
         sources,
@@ -557,7 +604,7 @@ def train_boosting(env, outdir, c):
         '--out-training-history-file ${TARGETS[0]}',
         '--log-file  ${TARGETS[1]}',
         '--llm-model-type', c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         f"--max-obs {c['max_train_obs']}" if c['max_train_obs'] else '',
         '--out-extractions', cached_extractions,
     ]
@@ -602,7 +649,7 @@ def evaluate_baseline(env, outdir, c):
         '--log-file ${TARGETS[0]}',
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         '--calib-plot ${TARGETS[1]}',
         '--result-csv ${TARGETS[3]}',
     ]
@@ -621,6 +668,50 @@ def evaluate_baseline(env, outdir, c):
     c['test_extractions'] = targets[2]
     c['extraction_agg'].append(targets[2])
     c['result_agg'].append(targets[3])
+
+    return env.Command(
+        targets,
+        sources,
+        ' '.join(map(str, cmd))
+    )
+
+@nest.add_target_with_env(localenv)
+def evaluate_coord(env, outdir, c):
+    label_setting = 'make_llm_labels' if c['y_llm'] else 'make_labels'
+    cmd = [
+        'python scripts/evaluate_bayesian.py',
+        f'--seed',
+        c['replicate_seed'] + 5,
+        '--method-name coord',
+        '--num-posterior-iters',
+        NUM_EPOCHS * c['num_meta_concepts'],
+        '--batch-size',
+        40,
+        '--in-dataset-file ${SOURCES[0]}',
+        '--indices-csv ${SOURCES[1]}',
+        '--training-history-file ${SOURCES[2]}',
+        '--out-extraction ${SOURCES[3]}',
+        '--log-file ${TARGETS[0]}',
+        '--calib-plot ${TARGETS[1]}',
+        '--llm-model-type',
+        c['llm_model'],
+        '--use-api',
+        '--prompt-concepts-file', CONCEPT_PROMPT_DICT[c['concept_extraction_type']],
+        '--result-csv ${TARGETS[2]}',
+    ]
+
+    sources = [
+        c[label_setting][0],
+        c['train_test_split'][0],
+        c['train_coord'][1],
+        c['test_extractions'],
+    ]
+    targets = [
+        path_join(outdir, 'test_coord_log.txt'),
+        path_join(outdir, 'calib_coord.png'),
+        path_join(outdir, 'result_coord.csv'),
+    ]
+    c['result_agg'].append(targets[2])
 
     return env.Command(
         targets,
@@ -684,9 +775,8 @@ def evaluate_boosting(env, outdir, c):
         '--log-file ${TARGETS[0]}',
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         '--result-csv ${TARGETS[1]}',
-        '--calib-plot ${TARGETS[2]}',
     ]
 
     sources = [
@@ -695,11 +785,9 @@ def evaluate_boosting(env, outdir, c):
         c['train_boosting'][0],
         c['test_extractions'],
     ]
-
     targets = [
         path_join(outdir, 'test_boosting_log.txt'),
         path_join(outdir, 'result_boosting.csv'),
-        path_join(outdir, 'calib_boosting.png'),
     ]
     c['result_agg'].append(targets[1])
 
@@ -748,16 +836,12 @@ nest.add(
     'proposal_type',  # how should the LLM propose concepts in the bayesian procedure
     [
         "conditional",
-        # "marginal",
-        # "error_obs", # doesnt work well
-        # "error_obs_w_conditional" # not much better than just conditional
     ],
     label_func=lambda c: "proposal_type_%s" % c)
 
 nest.add(
     'bayesian',
     [
-        # 'greedy',
         'bayesian',
     ])
 
@@ -777,12 +861,10 @@ def train_bayesian(env, outdir, c):
         'python scripts/train_bayesian.py',
         f'--seed',
         c['replicate_seed'] + 2,
-        '--batch-size', BATCH_SIZE,
-        '--num-greedy', NUM_GREEDY_EPOCHS,
+        '--batch-size', BATCH_SIZE * 4,
+        '--num-greedy-epoch', NUM_GREEDY_EPOCHS,
         '--max-epochs',
         NUM_EPOCHS,
-        '--num-restricted-epochs',
-        0,  # NUM_EPOCHS,
         '--num-meta-concepts',
         c['num_meta_concepts'],
         '--train-frac', c['train_frac'],
@@ -799,7 +881,7 @@ def train_bayesian(env, outdir, c):
         '--aucs-plot-file ${TARGETS[2]}',
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         '--prompt-iter-file', ITER_PROMPTS[c['proposal_type']],
         f"--max-obs {c['max_train_obs']}" if c['max_train_obs'] else '',
         '--init-concepts-file ${SOURCES[3]}',
@@ -810,7 +892,7 @@ def train_bayesian(env, outdir, c):
         c[label_setting][0],
         c['train_baseline'][0],
         c['train_test_split'][0],
-        c['llm_concept_extract_agg'][c['llm_model']],
+        c['llm_concept_extract_agg'][(c['llm_model'], c['keyphrase'])],
     ]
     targets = [
         path_join(outdir, 'log_train_bayesian.txt'),
@@ -847,7 +929,7 @@ def evaluate_bayesian(env, outdir, c):
         '--calib-plot ${TARGETS[1]}',
         '--llm-model-type',
         c['llm_model'],
-        '--use-api' if LLM_DICT[c['llm_model']] else '',
+        '--use-api',
         '--prompt-concepts-file', CONCEPT_PROMPT_DICT[c['concept_extraction_type']],
         '--result-csv ${TARGETS[2]}',
     ]
@@ -859,9 +941,9 @@ def evaluate_bayesian(env, outdir, c):
         c['test_extractions'],
     ]
     targets = [
-        path_join(outdir, 'test_bayesian_log.txt'),
-        path_join(outdir, 'calib_bayesian.png'),
-        path_join(outdir, 'result_bayesian.csv'),
+        path_join(outdir, 'test_bayesian_log_ece.txt'),
+        path_join(outdir, 'calib_bayesian_ece.png'),
+        path_join(outdir, 'result_bayesian_ece.csv'),
     ]
     c['result_agg'].append(targets[2])
 
@@ -905,6 +987,38 @@ def plot_bayesian(env, outdir, c):
         ' '.join(map(str, cmd))
     )
 
+# @nest.add_target_with_env(localenv)
+# def plot_bayesian_concept_check(env, outdir, c):
+#     if c['replicate_seed'] != 2:
+#         return
+        
+#     cmd = [
+#         'python scripts/plot_exp_mimic_check_concepts.py',
+#         f'--seed',
+#         c['seed'] + 15,
+#         '--num-posterior-iters',
+#         (NUM_EPOCHS - 1) * 6,
+#         '--history-file ${SOURCES[0]}',
+#         '--extraction-file ${SOURCES[1]}',
+#         '--labels-file ${SOURCES[2]}',
+#         '--indices-file ${SOURCES[3]}',
+#         '--log ${TARGETS[0]}',
+#     ]
+#     sources = [
+#         c['train_bayesian'][1],
+#         c['evaluate_baseline'][2],
+#         c['make_labels'][0],
+#         c['train_test_split'][0]
+#     ]
+#     targets = [
+#         path_join(outdir, 'log_conceptcheck.txt'),
+#     ]
+
+#     return env.Command(
+#         targets,
+#         sources,
+#         ' '.join(map(str, cmd))
+#     )
 
 nest.pop('residual_learner')
 
@@ -923,7 +1037,7 @@ def agg_results(env, outdir, c):
 
     sources = c['result_agg']
     targets = [
-        path_join(outdir, 'agg_res.csv'),
+        path_join(outdir, 'agg_res_ablation.csv'),
     ]
     c['res_agg_final'].append(targets[0])
 
@@ -933,9 +1047,7 @@ def agg_results(env, outdir, c):
         ' '.join(map(str, cmd))
     )
 
-
 nest.pop('max_train_obs')
-
 
 @nest.add_target_with_env(localenv)
 def plot_bayesian_agg(env, outdir, c):
@@ -949,13 +1061,13 @@ def plot_bayesian_agg(env, outdir, c):
         '--extraction-file ${SOURCES[4]} ${SOURCES[5]} ${SOURCES[6]} ${SOURCES[7]}',
         '--plot-embed ${TARGETS[0]}',
         '--plot-hier ${TARGETS[1]}',
-        '--concepts-csv ${TARGETS[2]}',
+        '--log ${TARGETS[2]}',
     ]
     sources = c['bayesian_agg'] + c['extraction_agg']
     targets = [
         path_join(outdir, 'bayesian_embed1.png'),
         path_join(outdir, 'bayesian_hier.png'),
-        path_join(outdir, 'concepts.csv'),
+        path_join(outdir, 'log.txt'),
     ]
 
     return env.Command(
@@ -1015,8 +1127,6 @@ def plot(env, outdir, c):
         '--in-result ${SOURCES[0]}',
         '--coverage-csv ${SOURCES[1]}',
         '--plot-file ${TARGETS[0]}',
-        # '--coverage-plot-file ${TARGETS[1]}',
-        # '--coverage-detailed-plot-file ${TARGETS[2]}',
     ]
 
     sources = [
@@ -1025,8 +1135,6 @@ def plot(env, outdir, c):
     ]
     targets = [
         path_join(outdir, 'mimic_compare.png'),
-        # path_join(outdir, 'mimic_coverage.png'),
-        # path_join(outdir, 'mimic_coverage_detailed.png'),
     ]
 
     return env.Command(

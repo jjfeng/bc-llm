@@ -1,0 +1,19 @@
+Given an image of a [[FAMILY]], our task is to brainstorm a set of descriptors that will help distinguish this bird type among the possible classes: [[CLASS_OPTIONS]]. List as many characteristics about the following bird image. Include both features that you think would be particularly helpful as well as ones that you may be unsure about. For each descriptor, also list as many descriptors that mean the same thing or generalizations of the descriptor. All descriptors, synonyms, and generalizations cannot be more than two words. Output characteristics that this bird has, such as "round wings" or "red head." Do not output categories of descriptors like "wing color" or "head shape." Output at least 10 keyphrases.
+
+Output in the following format:
+{
+    "keyphrases": [
+        "<STRING_OF_DESCRIPTOR1_AND_SYNONYMS_AND_GENERALIZATIONS>",
+        "<STRING_OF_DESCRIPTOR2_AND_SYNONYMS_AND_GENERALIZATIONS>",
+        ...
+    ]
+}
+
+Example:
+{
+    "keyphrases": [
+        "round wings",
+        "cardinal head, red head",
+        ...
+    ]
+}
