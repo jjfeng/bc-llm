@@ -35,13 +35,14 @@ llm-vi $ echo "HF_ACCESS_TOKEN=<YOUR TOKEN>" >> .env
 ### Citation
 If you find our paper and code useful, please cite us:
 ```r
-@misc{feng2024bcllm,
-      title={Bayesian Concept Bottleneck Models with LLM Priors}, 
-      author={Jean Feng and Avni Kothari and Luke Zier and Chandan Singh and Yan Shuo Tan},
-      year={2024},
-      eprint={2410.15555},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2410.15555}, 
+@ARTICLE{Feng2025-um,
+  title         = "Bayesian Concept Bottleneck Models with {LLM} Priors",
+  author        = "Feng, Jean and Kothari, Avni and Zier, Luke and Singh,
+                   Chandan and Tan, Yan Shuo",
+  journal       = "Adv. Neural Inf. Process. Syst.",
+  year          =  2025,
+  archivePrefix = "arXiv",
+  primaryClass  = "cs.LG",
+  url = "https://openreview.net/forum?id=oXSkzIXgbk"
 }
 ```
