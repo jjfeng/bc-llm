@@ -41,8 +41,6 @@ If you find our paper and code useful, please cite us:
                    Chandan and Tan, Yan Shuo",
   journal       = "Adv. Neural Inf. Process. Syst.",
   year          =  2025,
-  archivePrefix = "arXiv",
-  primaryClass  = "cs.LG",
   url = "https://openreview.net/forum?id=oXSkzIXgbk"
 }
 ```
